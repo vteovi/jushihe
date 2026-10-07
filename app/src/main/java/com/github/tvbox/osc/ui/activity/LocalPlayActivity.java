@@ -201,6 +201,27 @@ public class LocalPlayActivity extends BaseVbActivity<ActivityLocalPlayBinding> 
             public void exit() {
                 finish();
             }
+
+            @Override
+            public void externalPlay() {
+                if (mVideoList == null || mPosition < 0 || mPosition >= mVideoList.size()) {
+                    ToastUtils.showShort("暂无可播放文件");
+                    return;
+                }
+                File file = new File(mVideoList.get(mPosition).getPath());
+                if (!file.exists()) {
+                    ToastUtils.showShort("本地文件不存在");
+                    return;
+                }
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setDataAndType(Uri.parse("file://" + file.getAbsolutePath()), "video/*");
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                try {
+                    startActivity(intent);
+                } catch (Exception e) {
+                    ToastUtils.showShort("未找到可用的外部播放器");
+                }
+            }
         });
 
     }
