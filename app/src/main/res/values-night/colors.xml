@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- 大面积背景：OLED 纯黑（完全不发光） -->
+    <color name="bg_gray">#000000</color>
+    <color name="bg_popup">#000000</color>
+    <!-- 窗口背景：避免深色模式下转场/键盘弹出时白底闪烁 -->
+    <color name="windowBackground">#000000</color>
+
+    <!-- 层次色：纯黑背景上的细分隔/描边/未选中图标（细线条，OLED 功耗影响极小） -->
+    <color name="dialog_stroke">#2E2E2E</color>
+    <color name="light_gray_color">#4a4a4a</color>
+    <color name="disable_gray">#666666</color>
+    <color name="disable_text">#757575</color>
+
+    <!-- 文字颜色：保持可读性 -->
+    <color name="text_foreground">#FFFFFF</color>
+    <color name="text_sub_foreground">#AFAFAF</color>
+</resources>
