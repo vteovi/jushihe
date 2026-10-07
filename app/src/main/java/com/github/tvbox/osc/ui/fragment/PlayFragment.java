@@ -326,22 +326,6 @@ public class PlayFragment extends BaseLazyFragment {
             }
 
             @Override
-            public void externalPlay() {
-                if (TextUtils.isEmpty(mCurrentUrl)) {
-                    ToastUtils.showShort("暂无可播放地址");
-                    return;
-                }
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                intent.setDataAndType(Uri.parse(mCurrentUrl), "video/*");
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                try {
-                    activity.startActivity(intent);
-                } catch (Exception e) {
-                    ToastUtils.showShort("未找到可用的外部播放器");
-                }
-            }
-
-            @Override
             public void onHideBottom() {
                 if (mFullWindows){
                     ImmersionBar.with(activity)
