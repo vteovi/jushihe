@@ -73,7 +73,7 @@ Copy-Item $apk.FullName $dest -Force
 Write-Host ''
 Write-Host "==> APK 已保存到: $dest" -ForegroundColor Green
 Write-Host "    原始位置    : $($apk.FullName)"
-Write-Host "    大小        : {0:N1} MB" -f ($apk.Length / 1MB)
+Write-Host ("    大小        : {0:N1} MB" -f ($apk.Length / 1MB))
 
 # ---------- 4. 清理残留的 Java 进程（Gradle/Kotlin 相关） ----------
 if (-not $SkipJavaClean) {
