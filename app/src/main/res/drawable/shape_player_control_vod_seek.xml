@@ -3,14 +3,14 @@
     <item android:id="@android:id/background">
         <shape>
             <solid android:color="@color/color_6C3D3D3D" />
-            <size android:height="6dp" />
+            <size android:height="4dp" />
         </shape>
     </item>
     <item android:id="@android:id/secondaryProgress">
         <clip>
             <shape>
                 <solid android:color="@color/light_gray_color" />
-                <size android:height="6dp" />
+                <size android:height="4dp" />
             </shape>
         </clip>
     </item>
@@ -19,7 +19,7 @@
             <shape>
 <!--                进度条颜色-->
                 <solid android:color="@color/white" />
-                <size android:height="6dp" />
+                <size android:height="4dp" />
             </shape>
         </clip>
     </item>
