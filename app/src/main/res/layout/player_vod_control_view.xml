@@ -309,6 +309,11 @@
                 android:layout_marginLeft="4dp"
                 />
 
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
             <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/play_external"
                 android:layout_width="34dp"
