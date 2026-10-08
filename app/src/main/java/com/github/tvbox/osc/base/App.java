@@ -49,6 +49,7 @@ public class App extends MultiDexApplication {
     public void onCreate() {
         super.onCreate();
         instance = this;
+        isNormalStart = true;
         initParams();
         // OKGo
         OkGoHelper.init(); //台标获取
