@@ -30,7 +30,7 @@ import com.github.tvbox.osc.util.FastClickCheckUtil
 import com.github.tvbox.osc.util.FileUtils
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.HistoryHelper
-import com.github.tvbox.osc.util.LogUtils
+import com.github.tvbox.osc.util.LOG
 import com.github.tvbox.osc.util.OkGoHelper
 import com.github.tvbox.osc.util.PlayerHelper
 import com.github.tvbox.osc.util.Utils
@@ -514,7 +514,7 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
             }
             ToastUtils.showShort("备份成功")
         } catch (e: Exception) {
-            LogUtils.e(e)
+            LOG.e(e)
             ToastUtils.showShort("备份失败:" + e.message)
         }
     }
@@ -549,11 +549,11 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
                 ToastUtils.showShort("DB文件恢复失败")
                 return
             }
-            restoreHawkJson(hawkJson)
+            restoreHawkJson(hawkJson!!)
             ToastUtils.showShort("恢复成功,即将重启应用")
             Handler(Looper.getMainLooper()).postDelayed({ AppUtils.relaunchApp(true) }, 2000)
         } catch (e: Exception) {
-            LogUtils.e(e)
+            LOG.e(e)
             ToastUtils.showShort("恢复失败:" + e.message)
         }
     }
