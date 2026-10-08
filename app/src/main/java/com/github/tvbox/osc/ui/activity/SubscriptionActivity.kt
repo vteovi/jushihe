@@ -4,7 +4,6 @@ import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import android.os.Environment
-import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.text.TextUtils
 import android.view.View
@@ -199,32 +198,21 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
 
     /**
      * 处理系统文件管理器选中的文件：
-     * 1. 能解析出真实路径（在手机内置存储下）→ 直接引用原文件（clan:// 协议，App 内置服务动态读取）
-     * 2. 解析不出路径（云盘/虚拟文件等）→ 读取内容并复制到 App 自己的外部目录，再以 clan:// 引用
+     * 读取内容并复制到 App 自己的外部目录（Android/data/<pkg>/files/subscriptions/），
+     * 再以 clan:// 协议引用 —— App 读写自有目录无需任何存储权限，
+     * 内置 HTTP 服务读取必然成功（避免公共目录权限/路径解析导致的 404/5xx）。
      */
     private fun handlePickedFile(uri: Uri) {
         try {
             val name = getDisplayName(uri)
-            val realPath = resolveRealPath(uri)
-            val clanPath = if (!TextUtils.isEmpty(realPath) && realPath.startsWith(
-                    Environment.getExternalStorageDirectory().getAbsolutePath()
-                )
-            ) {
-                realPath.replace(
-                    Environment.getExternalStorageDirectory().getAbsolutePath(),
-                    "clan://localhost"
-                )
-            } else {
-                // 拿不到真实路径：读取内容，复制到 App 自己的外部目录（无需存储权限）
-                val content = readUriText(uri)
-                if (content.isNullOrBlank()) {
-                    ToastUtils.showShort("读取文件失败或内容为空")
-                    return
-                }
-                copyToAppExternalDir(name, content) ?: run {
-                    ToastUtils.showShort("保存订阅文件失败")
-                    return
-                }
+            val content = readUriText(uri)
+            if (content.isNullOrBlank()) {
+                ToastUtils.showShort("读取文件失败或内容为空")
+                return
+            }
+            val clanPath = copyToAppExternalDir(name, content) ?: run {
+                ToastUtils.showShort("保存订阅文件失败")
+                return
             }
             for (item in mSubscriptions) {
                 if (item.url == clanPath) {
@@ -237,31 +225,6 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
             LogUtils.e(e)
             ToastUtils.showShort("导入失败:" + e.message)
         }
-    }
-
-    /** 解析系统 Uri 对应的真实文件路径，解析不出返回空串 */
-    private fun resolveRealPath(uri: Uri): String {
-        if ("file" == uri.scheme) {
-            return uri.path ?: ""
-        }
-        if ("content" != uri.scheme) {
-            return ""
-        }
-        // 1) 直接查 _data 列（部分文件管理器仍会返回真实路径）
-        val data = queryColumn(uri, "_data")
-        if (!TextUtils.isEmpty(data)) {
-            return data!!
-        }
-        // 2) DocumentsUI 的 document id：primary:Download/x.json
-        try {
-            val docId = DocumentsContract.getDocumentId(uri)
-            if (docId.startsWith("primary:")) {
-                return Environment.getExternalStorageDirectory().getAbsolutePath() + "/" +
-                        docId.substring("primary:".length)
-            }
-        } catch (ignored: Throwable) {
-        }
-        return ""
     }
 
     private fun queryColumn(uri: Uri, column: String): String? {
