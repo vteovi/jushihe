@@ -12,6 +12,9 @@
     <color name="light_gray_color">#4a4a4a</color>
     <color name="disable_gray">#666666</color>
     <color name="disable_text">#757575</color>
+    <!-- 搜索框背景与描边(夜间纯黑底上略亮一档的底+明显亮边框) -->
+    <color name="search_box_bg">#1A1A1A</color>
+    <color name="search_box_stroke">#4A4A4A</color>
 
     <!-- 文字颜色：保持可读性 -->
     <color name="text_foreground">#FFFFFF</color>

@@ -30,6 +30,9 @@
     <color name="bg_popup">#FFFFFF</color>
     <!--    弹窗描边(日间白弹窗上近乎隐形,夜间深灰细线区分纯黑弹窗边界)-->
     <color name="dialog_stroke">#EEEEEE</color>
+    <!--    搜索框背景与描边(日间浅灰底+浅边框)-->
+    <color name="search_box_bg">#F2F3F5</color>
+    <color name="search_box_stroke">#C8C8C8</color>
 
     <!--    制定颜色-->
     <!--    页面背景色,activity.fragment等-->
