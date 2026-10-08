@@ -82,6 +82,11 @@ public class SourceViewModel extends ViewModel {
             return;
         }
         SourceBean sourceBean = ApiConfig.get().getSource(sourceKey);
+        if (sourceBean == null) {
+            // 配置解析后站点列表为空(订阅异常/无sites)时,homeSourceBean可能残留旧引用,查无此源需保护,避免NPE崩溃
+            sortResult.postValue(null);
+            return;
+        }
         int type = sourceBean.getType();
         if (type == 3) {
             Runnable waitResponse = new Runnable() {
