@@ -44,6 +44,7 @@ import com.github.tvbox.osc.ui.adapter.LiveChannelItemNewAdapter;
 import com.github.tvbox.osc.ui.adapter.LiveSettingGroupAdapter;
 import com.github.tvbox.osc.ui.adapter.LiveSettingItemAdapter;
 import com.github.tvbox.osc.ui.dialog.AllChannelsRightDialog;
+import com.github.tvbox.osc.ui.dialog.ApiHistoryDialog;
 import com.github.tvbox.osc.ui.dialog.CastListDialog;
 import com.github.tvbox.osc.ui.dialog.LivePasswordDialog;
 import com.github.tvbox.osc.ui.dialog.LiveSettingDialog;
@@ -774,8 +775,7 @@ public class LiveActivity extends BaseActivity {
     private void initLiveChannelList() {
         List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
         if (list.isEmpty()) {
-            Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
-            finish();
+            showChangeLiveSourceDialog();
             return;
         }
 
@@ -795,8 +795,7 @@ public class LiveActivity extends BaseActivity {
             Uri parsedUrl = Uri.parse(url);
             url = new String(Base64.decode(parsedUrl.getQueryParameter("ext"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP), "UTF-8");
         } catch (Throwable th) {
-            Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
-            finish();
+            showChangeLiveSourceDialog();
             return;
         }
         showLoading();
@@ -817,8 +816,7 @@ public class LiveActivity extends BaseActivity {
                 ApiConfig.get().loadLives(livesArray);
                 List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
                 if (list.isEmpty()) {
-                    Toast.makeText(App.getInstance(), "频道列表为空", Toast.LENGTH_SHORT).show();
-                    finish();
+                    showChangeLiveSourceDialog();
                     return;
                 }
                 liveChannelGroupList.clear();
@@ -833,6 +831,71 @@ public class LiveActivity extends BaseActivity {
                 });
             }
         });
+    }
+
+    /**
+     * 直播源为空/不可用时，弹出「换直播源」入口：
+     * 从历史直播源中选择（写入 LIVE_URL 后重载配置），无可用源则引导去设置添加
+     */
+    private void showChangeLiveSourceDialog() {
+        String currentLive = Hawk.get(HawkConfig.LIVE_URL, "");
+        ArrayList<String> liveHistory = Hawk.get(HawkConfig.LIVE_HISTORY, new ArrayList<String>());
+        boolean hasOtherSource = false;
+        for (String url : liveHistory) {
+            if (!url.equals(currentLive)) {
+                hasOtherSource = true;
+                break;
+            }
+        }
+        if (!hasOtherSource) {
+            new XPopup.Builder(this)
+                    .asConfirm("换直播源", "当前没有可用的直播源，也没有历史直播源记录。\n请到 设置 → 直播源 中添加直播源地址。", "退出", "去设置", () -> {
+                        jumpActivity(SettingActivity.class);
+                        finish();
+                    }, () -> finish(), false)
+                    .show();
+            return;
+        }
+        new XPopup.Builder(this)
+                .asCustom(new ApiHistoryDialog(this, currentLive, text -> {
+                    Hawk.put(HawkConfig.LIVE_URL, text.toString());
+                    ToastUtils.showShort("正在切换直播源...");
+                    reloadLiveConfig();
+                }))
+                .show();
+    }
+
+    /** 按新的 LIVE_URL 重新加载配置并刷新直播频道列表 */
+    private void reloadLiveConfig() {
+        showLoading();
+        ApiConfig.get().loadConfig(false, new ApiConfig.LoadConfigCallback() {
+            @Override
+            public void success() {
+                mHandler.post(() -> {
+                    showSuccess();
+                    liveChannelGroupList.clear();
+                    liveChannelGroupList.addAll(ApiConfig.get().getChannelGroupList());
+                    if (liveChannelGroupList.isEmpty()) {
+                        showChangeLiveSourceDialog();
+                    } else {
+                        initLiveState();
+                    }
+                });
+            }
+
+            @Override
+            public void retry() {
+            }
+
+            @Override
+            public void error(String msg) {
+                mHandler.post(() -> {
+                    showSuccess();
+                    ToastUtils.showShort("直播源加载失败:" + msg);
+                    showChangeLiveSourceDialog();
+                });
+            }
+        }, this);
     }
 
     private void initLiveState() {
