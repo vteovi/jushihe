@@ -1,16 +1,25 @@
 package com.github.tvbox.osc.ui.activity
 
+import android.content.Context
 import android.content.DialogInterface
+import android.content.Intent
+import android.content.SharedPreferences
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import androidx.recyclerview.widget.DiffUtil
+import com.blankj.utilcode.util.AppUtils
 import com.blankj.utilcode.util.ToastUtils
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.api.ApiConfig
+import com.github.tvbox.osc.base.App
 import com.github.tvbox.osc.base.BaseVbActivity
 import com.github.tvbox.osc.bean.IJKCode
 import com.github.tvbox.osc.constant.IntentKey
+import com.github.tvbox.osc.data.AppDataManager
 import com.github.tvbox.osc.databinding.ActivitySettingBinding
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
@@ -21,17 +30,26 @@ import com.github.tvbox.osc.util.FastClickCheckUtil
 import com.github.tvbox.osc.util.FileUtils
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.HistoryHelper
+import com.github.tvbox.osc.util.LogUtils
 import com.github.tvbox.osc.util.OkGoHelper
 import com.github.tvbox.osc.util.PlayerHelper
 import com.github.tvbox.osc.util.Utils
-import com.hjq.permissions.OnPermissionCallback
-import com.hjq.permissions.Permission
-import com.hjq.permissions.XXPermissions
 import com.lxj.xpopup.XPopup
 import com.orhanobut.hawk.Hawk
 import okhttp3.HttpUrl
+import org.json.JSONObject
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 /**
  * @author pj567
@@ -122,33 +140,16 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
 
         mBinding.llBackup.setOnClickListener { v: View? ->
             FastClickCheckUtil.check(v)
-            if (XXPermissions.isGranted(this@SettingActivity, Permission.MANAGE_EXTERNAL_STORAGE)) {
-                val dialog = BackupDialog(this@SettingActivity)
-                dialog.show()
-            } else {
-                XXPermissions.with(this@SettingActivity)
-                    .permission(Permission.MANAGE_EXTERNAL_STORAGE)
-                    .request(object : OnPermissionCallback {
-                        override fun onGranted(permissions: List<String>, all: Boolean) {
-                            if (all) {
-                                val dialog = BackupDialog(this@SettingActivity)
-                                dialog.show()
-                            }
-                        }
+            val dialog = BackupDialog(this@SettingActivity, object : BackupDialog.ActionListener {
+                override fun onBackup() {
+                    startBackupSaf()
+                }
 
-                        override fun onDenied(permissions: List<String>, never: Boolean) {
-                            if (never) {
-                                ToastUtils.showLong("获取存储权限失败,请在系统设置中开启")
-                                XXPermissions.startPermissionActivity(
-                                    this@SettingActivity,
-                                    permissions
-                                )
-                            } else {
-                                ToastUtils.showShort("获取存储权限失败")
-                            }
-                        }
-                    })
-            }
+                override fun onRestore() {
+                    startRestoreSaf()
+                }
+            })
+            dialog.show()
         }
 
         mBinding.llDns.setOnClickListener { v: View? ->
@@ -430,6 +431,133 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
         }
     }
 
+    // ============ 数据备份/还原（系统文件选择器，无需存储权限） ============
+
+    private fun startBackupSaf() {
+        val name = "MBox备份-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date())}.zip"
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/zip"
+            putExtra(Intent.EXTRA_TITLE, name)
+        }
+        startActivityForResult(intent, REQ_BACKUP)
+    }
+
+    private fun startRestoreSaf() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/octet-stream"))
+        }
+        startActivityForResult(intent, REQ_RESTORE)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != RESULT_OK) return
+        val uri = data?.data ?: return
+        when (requestCode) {
+            REQ_BACKUP -> doBackupSaf(uri)
+            REQ_RESTORE -> doRestoreSaf(uri)
+        }
+    }
+
+    /** 读取 Hawk2 / crypto.KEY_256 全部配置为 JSON 字符串 */
+    private fun buildHawkJson(): String {
+        val jsonObject = JSONObject()
+        var sp = App.getInstance().getSharedPreferences("Hawk2", Context.MODE_PRIVATE)
+        for (key in sp.all.keys) {
+            jsonObject.put(key, sp.getString(key, ""))
+        }
+        sp = App.getInstance().getSharedPreferences("crypto.KEY_256", Context.MODE_PRIVATE)
+        for (key in sp.all.keys) {
+            jsonObject.put(key, sp.getString(key, ""))
+        }
+        return jsonObject.toString()
+    }
+
+    /** 把 JSON 写回 Hawk2 / crypto.KEY_256 */
+    private fun restoreHawkJson(hawkJson: String) {
+        val jsonObject = JSONObject(hawkJson)
+        val it = jsonObject.keys()
+        val sharedPreferences = App.getInstance().getSharedPreferences("Hawk2", Context.MODE_PRIVATE)
+        while (it.hasNext()) {
+            val key = it.next()
+            val value = jsonObject.getString(key)
+            if (key == "cipher_key") {
+                App.getInstance().getSharedPreferences("crypto.KEY_256", Context.MODE_PRIVATE)
+                    .edit().putString(key, value).commit()
+            } else {
+                sharedPreferences.edit().putString(key, value).commit()
+            }
+        }
+    }
+
+    /** 备份：sqlite + hawk 打包为 zip 写入系统文件选择器选中的位置 */
+    private fun doBackupSaf(uri: Uri) {
+        try {
+            val dbTmp = File(cacheDir, "backup_sqlite_tmp")
+            if (!AppDataManager.backup(dbTmp)) {
+                ToastUtils.showShort("DB备份失败")
+                return
+            }
+            val hawkJson = buildHawkJson()
+            contentResolver.openOutputStream(uri)?.use { out ->
+                ZipOutputStream(BufferedOutputStream(out)).use { zip ->
+                    zip.putNextEntry(ZipEntry("sqlite"))
+                    FileInputStream(dbTmp).use { it.copyTo(zip) }
+                    zip.closeEntry()
+                    zip.putNextEntry(ZipEntry("hawk"))
+                    zip.write(hawkJson.toByteArray(Charsets.UTF_8))
+                    zip.closeEntry()
+                }
+            }
+            ToastUtils.showShort("备份成功")
+        } catch (e: Exception) {
+            LogUtils.e(e)
+            ToastUtils.showShort("备份失败:" + e.message)
+        }
+    }
+
+    /** 恢复：读取 zip，解出 sqlite + hawk 并恢复 */
+    private fun doRestoreSaf(uri: Uri) {
+        try {
+            val dbTmp = File(cacheDir, "restore_sqlite_tmp")
+            var hawkJson: String? = null
+            contentResolver.openInputStream(uri)?.use { input ->
+                ZipInputStream(BufferedInputStream(input)).use { zip ->
+                    var entry = zip.nextEntry
+                    while (entry != null) {
+                        when (entry.name) {
+                            "sqlite" -> FileOutputStream(dbTmp).use { zip.copyTo(it) }
+                            "hawk" -> hawkJson = zip.readBytes().decodeToString()
+                        }
+                        zip.closeEntry()
+                        entry = zip.nextEntry
+                    }
+                }
+            }
+            if (!dbTmp.exists()) {
+                ToastUtils.showShort("备份文件不包含数据库")
+                return
+            }
+            if (hawkJson.isNullOrEmpty()) {
+                ToastUtils.showShort("备份文件不包含配置数据")
+                return
+            }
+            if (!AppDataManager.restore(dbTmp)) {
+                ToastUtils.showShort("DB文件恢复失败")
+                return
+            }
+            restoreHawkJson(hawkJson)
+            ToastUtils.showShort("恢复成功,即将重启应用")
+            Handler(Looper.getMainLooper()).postDelayed({ AppUtils.relaunchApp(true) }, 2000)
+        } catch (e: Exception) {
+            LogUtils.e(e)
+            ToastUtils.showShort("恢复失败:" + e.message)
+        }
+    }
+
     override fun onBackPressed() {
         if (homeRec != Hawk.get(HawkConfig.HOME_REC, 0) || dnsOpt != Hawk.get(
                 HawkConfig.DOH_URL,
@@ -471,5 +599,10 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
             1 -> "站点推荐"
             else -> "关闭"
         }
+    }
+
+    companion object {
+        private const val REQ_BACKUP = 20001
+        private const val REQ_RESTORE = 20002
     }
 }
