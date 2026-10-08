@@ -49,11 +49,11 @@
             android:layout_width="wrap_content"
             android:layout_weight="1"
             android:layout_height="36dp"
-            android:background="@drawable/bg_large_round_gray"
+            android:background="@drawable/bg_search_box"
             android:gravity="center_vertical"
             android:paddingHorizontal="12sp"
             android:hint="搜索"
-            android:drawableTint="@color/gray_darker"
+            android:drawableTint="@color/text_sub_foreground"
             android:layout_marginLeft="10dp"
             android:layout_marginRight="6dp"
             android:drawableRight="@drawable/ic_search_18"/>
