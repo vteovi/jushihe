@@ -5,6 +5,8 @@ import android.view.View;
 
 import androidx.annotation.NonNull;
 
+import com.github.tvbox.osc.R;
+
 import org.jetbrains.annotations.NotNull;
 
 public class BackupDialog extends BaseDialog {
