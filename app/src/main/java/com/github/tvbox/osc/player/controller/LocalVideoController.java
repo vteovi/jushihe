@@ -643,14 +643,9 @@ public class LocalVideoController extends BaseController {
     }
 
     void setLandscapePortrait() {
-        int requestedOrientation = mActivity.getRequestedOrientation();
-        if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE || requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE || requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE) {
-            mLandscapePortraitBtn.setText("横屏");
-            mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
-        } else if (requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_PORTRAIT || requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT || requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT) {
-            mLandscapePortraitBtn.setText("竖屏");
-            mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
-        }
+        // 本项目全程竖屏锁定：不再切换横屏
+        mLandscapePortraitBtn.setText("竖屏");
+        mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
     }
 
     void initSubtitleInfo() {

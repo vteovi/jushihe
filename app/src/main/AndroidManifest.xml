@@ -36,27 +36,32 @@
         <activity
             android:name=".ui.activity.SplashActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/SplashTheme" />
         <activity
             android:name=".ui.activity.SubscriptionActivity"
             android:configChanges="orientation|screenSize"
-            android:exported="false" />
+            android:exported="false"
+            android:screenOrientation="portrait" />
         <activity
             android:name=".ui.activity.VideoListActivity"
-            android:configChanges="orientation|screenSize"/>
+            android:configChanges="orientation|screenSize"
+            android:screenOrientation="portrait"/>
         <activity
             android:name=".ui.activity.MovieFoldersActivity"
             android:configChanges="orientation|screenSize"
-            android:exported="false"/>
+            android:exported="false"
+            android:screenOrientation="portrait"/>
         <activity
             android:name=".ui.activity.LocalPlayActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false"
-            android:screenOrientation="landscape" />
+            android:screenOrientation="portrait" />
         <activity
             android:name=".ui.activity.MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
-            android:exported="true">
+            android:exported="true"
+            android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <action android:name="android.intent.action.VIEW" />
@@ -66,25 +71,31 @@
         <activity
             android:name=".ui.activity.LiveActivity"
             android:launchMode="singleTop"
-            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout"/>
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout"
+            android:screenOrientation="portrait"/>
         <activity
             android:name=".ui.activity.DetailActivity"
             android:supportsPictureInPicture="true"
             android:launchMode="singleTask"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|uiMode"/>
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|uiMode"
+            android:screenOrientation="portrait"/>
         <activity
             android:name=".ui.activity.FastSearchActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="portrait"
             />
         <activity
             android:name=".ui.activity.SettingActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"/>
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="portrait"/>
         <activity
             android:name=".ui.activity.HistoryActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="portrait" />
         <activity
             android:name=".ui.activity.CollectActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"/>
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="portrait"/>
 
         <service android:name="com.android.cast.dlna.dmc.DLNACastService"/>
 

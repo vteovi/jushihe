@@ -29,6 +29,7 @@ import com.github.tvbox.osc.ui.dialog.GridFilterDialog;
 import com.github.tvbox.osc.ui.tv.widget.LoadMoreView;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
+import com.github.tvbox.osc.util.Utils;
 import com.github.tvbox.osc.viewmodel.SourceViewModel;
 import com.orhanobut.hawk.Hawk;
 import com.owen.tvrecyclerview.widget.TvRecyclerView;
@@ -56,6 +57,8 @@ public class GridFragment extends BaseLazyFragment {
     private boolean isLoad = false;
     private boolean isTop = true;
     private View focusedView = null;
+    /** 当前网格列数，用于检测"横屏海报"开关变化后是否需要重建 LayoutManager */
+    private int mCurrentSpanCount = -1;
     private class GridInfo{
         public String sortID="";
         public RecyclerView mGridView;
@@ -178,7 +181,8 @@ public class GridFragment extends BaseLazyFragment {
     private void initView() {
         this.createView();
         mGridView.setAdapter(gridAdapter);
-        mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, 3));
+        mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, Utils.getPosterSpanCount(this.mContext)));
+        mCurrentSpanCount = Utils.getPosterSpanCount(this.mContext);
 
         gridAdapter.setOnLoadMoreListener(new BaseQuickAdapter.RequestLoadMoreListener() {
             @Override
@@ -235,6 +239,18 @@ public class GridFragment extends BaseLazyFragment {
 
         findViewById(R.id.btn_filter).setOnClickListener(view -> showFilter());
         setLoadSir2(mGridView);
+    }
+
+    @Override
+    protected void onFragmentResume() {
+        super.onFragmentResume();
+        // 从设置页切换"横屏海报"开关返回后，列数可能变化；仅在变化时重建，避免普通返回丢失滚动位置
+        int span = Utils.getPosterSpanCount(this.mContext);
+        if (mGridView != null && span != mCurrentSpanCount) {
+            mCurrentSpanCount = span;
+            mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, span));
+            if (gridAdapter != null) gridAdapter.notifyDataSetChanged();
+        }
     }
 
     private void initViewModel() {

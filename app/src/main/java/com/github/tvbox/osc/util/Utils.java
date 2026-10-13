@@ -1,5 +1,6 @@
 package com.github.tvbox.osc.util;
 
+import android.content.Context;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.os.Build;
@@ -22,6 +23,15 @@ public class Utils {
 
     public static boolean supportsPiPMode() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
+    }
+
+    /**
+     * 首页海报网格列数（本项目仅适配手机竖屏，不做平板/横屏适配）。
+     * 横屏海报开关打开：一行一张 16:9 横版卡片 → 1 列。
+     * 关闭：竖版 2:3 海报 → 2 列。
+     */
+    public static int getPosterSpanCount(Context context) {
+        return Hawk.get(HawkConfig.LANDSCAPE_CARD, false) ? 1 : 2;
     }
 
     public static int getSeriesSpanCount(List<VodInfo.VodSeries> list) {

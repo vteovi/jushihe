@@ -59,6 +59,7 @@ cd D:\Doubao\TVBoxOS_Portrait
 | 1.2.3 | 首页搜索框深色不明显修复（bg_large_round_gray 被 12 处共用不可改，只把首页 search 项换 bg_search_box + 图标 tint）；直播页添加"换直播源"功能（LiveActivity 三处失败分支 → showChangeLiveSourceDialog；有历史源弹 ApiHistoryDialog，无则提示去设置） |
 | 1.2.4 | 移除"我的"页本地视频功能入口 + 移除文件访问权限（删 XXPermissions 运行时申请、删 Manifest 三个存储权限声明 READ/WRITE/MANAGE_EXTERNAL_STORAGE；订阅导入/备份还原走 SAF 不受影响） |
 | 1.2.5 | 修复首页崩溃 NPE（SourceViewModel.getSort 空保护） |
+| 1.2.6 | 主页海报重做：新增 `RatioShadowLayout`（按开关切 2:3 竖版 / 16:9 横版卡片）；设置页加"横屏海报"开关（HawkConfig.LANDSCAPE_CARD，开=单列 16:9 横幅，关=双列 2:3 海报）；Utils.getPosterSpanCount() 统一列数，GridFragment/UserFragment 读开关；**全程锁定竖屏**（Manifest 所有 Activity screenOrientation=portrait，去掉播放器 SENSOR_LANDSCAPE 代码请求），不做平板/横屏适配 |
 
 ## 五、崩溃修复记录（遇到同栈报错先对照这里）
 

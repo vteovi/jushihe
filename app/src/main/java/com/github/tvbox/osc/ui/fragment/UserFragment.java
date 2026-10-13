@@ -30,6 +30,7 @@ import com.github.tvbox.osc.ui.adapter.GridAdapter;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.UA;
+import com.github.tvbox.osc.util.Utils;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -75,7 +76,7 @@ public class UserFragment extends BaseLazyFragment {
         super.onFragmentResume();
 
         tvHotList1.setHasFixedSize(true);
-        tvHotList1.setLayoutManager(new GridLayoutManager(this.mContext, 3));
+        tvHotList1.setLayoutManager(new GridLayoutManager(this.mContext, Utils.getPosterSpanCount(this.mContext)));
     }
 
     @Override

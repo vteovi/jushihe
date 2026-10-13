@@ -61,6 +61,7 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
     private var homeRec = Hawk.get(HawkConfig.HOME_REC, 0)
     private var dnsOpt = Hawk.get(HawkConfig.DOH_URL, 0)
     private var currentLiveApi = Hawk.get(HawkConfig.LIVE_URL, "")
+    private var landscapeCard = Hawk.get(HawkConfig.LANDSCAPE_CARD, false)
     override fun init() {
 
         mBinding.titleBar.leftView.setOnClickListener { onBackPressed() }
@@ -80,6 +81,13 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
             val newConfig = !Hawk.get(HawkConfig.PRIVATE_BROWSING, false)
             mBinding.switchPrivateBrowsing.setChecked(newConfig)
             Hawk.put(HawkConfig.PRIVATE_BROWSING, newConfig)
+        }
+
+        mBinding.switchLandscapeCard.setChecked(Hawk.get(HawkConfig.LANDSCAPE_CARD, false))
+        mBinding.llLandscapeCard.setOnClickListener { view: View? ->
+            val newConfig = !Hawk.get(HawkConfig.LANDSCAPE_CARD, false)
+            mBinding.switchLandscapeCard.setChecked(newConfig)
+            Hawk.put(HawkConfig.LANDSCAPE_CARD, newConfig)
         }
 
         mBinding.llLiveApi.setOnClickListener {
@@ -563,7 +571,8 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
                 HawkConfig.DOH_URL,
                 0
             ) || currentLiveApi != Hawk.get(HawkConfig.LIVE_URL, "")
-        ) { // 首页类型/dns/doh/直播源有更改,需重载页面
+            || landscapeCard != Hawk.get(HawkConfig.LANDSCAPE_CARD, false)
+        ) { // 首页类型/dns/doh/直播源/横屏海报有更改,需重载页面
             //AppManager.getInstance().finishAllActivity()
             if (currentLiveApi == Hawk.get(HawkConfig.LIVE_URL, "")) { //未更改直播源,不需重载api等
                 val bundle = Bundle()

@@ -64,4 +64,9 @@ public class HawkConfig {
      * 搜索记录
      */
     public static final String HISTORY_SEARCH = "history_search";
+    /**
+     * 横屏海报开关：true=一行一张 16:9 横版卡片(单列)；false=竖版 2:3 海报(两列)
+     * 本项目全程竖屏，此处仅控制卡片形状与列数，不触发设备旋转。
+     */
+    public static final String LANDSCAPE_CARD = "landscape_card";
 }
