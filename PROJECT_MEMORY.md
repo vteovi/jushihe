@@ -62,6 +62,7 @@ cd D:\Doubao\TVBoxOS_Portrait
 | 1.2.6 | 主页海报重做：新增 `RatioShadowLayout`（按开关切 2:3 竖版 / 16:9 横版卡片）；设置页加"横屏海报"开关（HawkConfig.LANDSCAPE_CARD，开=单列 16:9 横幅，关=双列 2:3 海报）；Utils.getPosterSpanCount() 统一列数，GridFragment/UserFragment 读开关；**全程锁定竖屏**（Manifest 所有 Activity screenOrientation=portrait，去掉播放器 SENSOR_LANDSCAPE 代码请求），不做平板/横屏适配 |
 | 1.3.1 | **回滚播放页竖屏锁定**：全屏播放横竖屏逻辑恢复原样（宽视频全屏自动切传感器横屏、退出回竖屏、控制条横竖屏切换按钮均保留）。仅主页/列表/设置等 UI 页在 Manifest 锁 portrait；DetailActivity/LiveActivity 不指定方向（由 PlayFragment 代码控制），LocalPlayActivity 仍 landscape。横屏海报开关功能不变 |
 | 1.3.2 | **海报磁盘缓存**：移植 TVBoxOS-Mobile 的 MyOkhttpDownLoader（按 URL MD5 落盘到 cacheDir/picasso，命中直接读文件不再走网络，网络成功写盘+tmp 临时文件 rename）；OkGoHelper.initPicasso 改用 `new MyOkhttpDownLoader(client, App.getInstance())`。设置页"清空缓存"清的是 getCacheDir()，picasso 子目录一并清除，无需额外改动 |
+| 1.3.3 | **打开秒开加速**（移植 Mobile launch 系列提交）：①GridFragment 每个 Tab 第一页视频列表按 `grid_cache_{sourceKey}_{sortId}` 缓存到 Hawk，打开时先读缓存立即渲染、后台静默拉新替换，有缓存不转圈；②HomeFragment 分栏 tabs 及主页推荐列表按 `sort_cache_{sourceKey}`(+`_rec`) 缓存，config/jar 就绪后先读缓存立即建 ViewPager，不等 sort 网络请求；后台 sort 返回若分栏 id 序列与已渲染一致则跳过 initViewPager()，避免跳顶/闪烁；③Grid/Collect/History/FastSearch/Search 五个图片 adapter 去掉 `.placeholder()`，缓存海报直接解码显示，error 仍回退加载图 |
 
 ## 五、崩溃修复记录（遇到同栈报错先对照这里）
 

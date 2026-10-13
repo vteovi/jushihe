@@ -112,6 +112,7 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
         sourceViewModel = ViewModelProvider(this).get(SourceViewModel::class.java)
         sourceViewModel?.sortResult?.observe(this) { absXml: AbsSortXml? ->
             showSuccess()
+            val oldSortIds = mSortDataList.map { it.id }
             mSortDataList =
                 if (absXml?.classes != null && absXml.classes.sortList != null) {
                     DefaultConfig.adjustSort(
@@ -122,7 +123,21 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
                 } else {
                     DefaultConfig.adjustSort(ApiConfig.get().homeSourceBean.key, ArrayList(), true)
                 }
-            initViewPager(absXml)
+            // 缓存分栏列表，下次打开立即渲染
+            try {
+                val cacheKey = "sort_cache_" + ApiConfig.get().homeSourceBean.key
+                Hawk.put(cacheKey, com.blankj.utilcode.util.GsonUtils.toJson(mSortDataList))
+                if (absXml?.videoList != null) {
+                    Hawk.put(cacheKey + "_rec", com.blankj.utilcode.util.GsonUtils.toJson(absXml.videoList))
+                }
+            } catch (ignore: Exception) {}
+            // 已用缓存渲染过 ViewPager，且分栏 id 序列没变，就不重建（避免跳回顶部/闪烁）
+            val newSortIds = mSortDataList.map { it.id }
+            val alreadyRendered = fragments.isNotEmpty()
+            val sameStructure = oldSortIds.size == newSortIds.size && oldSortIds.zip(newSortIds).all { it.first == it.second }
+            if (!alreadyRendered || !sameStructure) {
+                initViewPager(absXml)
+            }
         }
     }
 
@@ -141,6 +156,33 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
             dataInitOk && jarInitOk -> {
                 //正常初始化会先加载,最终到这,此时数据有以下几种情况
                 // 1. api/jar/spider等均加载完,正常显示数据。2. 缺失spider(存疑?)/api配置有问题同样加载(最后空布局 或 只有豆瓣首页)
+
+                // 先读本地缓存的分栏列表，立即渲染，不转圈；后台再拉新数据刷新
+                val cacheKey = "sort_cache_" + ApiConfig.get().homeSourceBean.key
+                val cacheJson = Hawk.get(cacheKey, "")
+                if (!cacheJson.isEmpty() && mSortDataList.isEmpty()) {
+                    try {
+                        val cachedList: ArrayList<SortData>? = com.blankj.utilcode.util.GsonUtils.fromJson(
+                            cacheJson,
+                            object : com.google.gson.reflect.TypeToken<ArrayList<SortData>>() {}.type
+                        )
+                        if (cachedList != null && cachedList.isNotEmpty()) {
+                            mSortDataList = cachedList
+                            // 读缓存的主页推荐数据
+                            val recJson = Hawk.get(cacheKey + "_rec", "")
+                            val recList: ArrayList<com.github.tvbox.osc.bean.Movie.Video>? = if (recJson.isEmpty()) null else
+                                com.blankj.utilcode.util.GsonUtils.fromJson(
+                                    recJson,
+                                    object : com.google.gson.reflect.TypeToken<ArrayList<com.github.tvbox.osc.bean.Movie.Video>>() {}.type
+                                )
+                            val fakeXml = AbsSortXml()
+                            if (recList != null) fakeXml.videoList = recList
+                            showSuccess()
+                            initViewPager(fakeXml)
+                        }
+                    } catch (ignore: Exception) {}
+                }
+
                 sourceViewModel?.getSort(ApiConfig.get().homeSourceBean.key)
             }
             dataInitOk && !jarInitOk -> {
