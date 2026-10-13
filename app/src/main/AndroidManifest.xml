@@ -56,7 +56,7 @@
             android:name=".ui.activity.LocalPlayActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false"
-            android:screenOrientation="portrait" />
+            android:screenOrientation="landscape" />
         <activity
             android:name=".ui.activity.MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode"
@@ -71,14 +71,12 @@
         <activity
             android:name=".ui.activity.LiveActivity"
             android:launchMode="singleTop"
-            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout"
-            android:screenOrientation="portrait"/>
+            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout"/>
         <activity
             android:name=".ui.activity.DetailActivity"
             android:supportsPictureInPicture="true"
             android:launchMode="singleTask"
-            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|uiMode"
-            android:screenOrientation="portrait"/>
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|uiMode"/>
         <activity
             android:name=".ui.activity.FastSearchActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"

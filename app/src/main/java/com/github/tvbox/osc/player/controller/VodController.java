@@ -673,10 +673,14 @@ public class VodController extends BaseController {
     }
 
     /**
-     * 横竖屏切换（本项目全程竖屏锁定：保持竖屏，不再切横屏）
+     * 横竖屏切换
      */
     void setLandscapePortrait() {
-        mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        if (com.blankj.utilcode.util.ScreenUtils.isPortrait()){
+            mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        }else {
+            mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT);
+        }
     }
 
     void initSubtitleInfo() {
