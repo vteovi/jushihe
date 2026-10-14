@@ -57,6 +57,7 @@ public class GridFragment extends BaseLazyFragment {
     private int page = 1;
     private int maxPage = 1;
     private boolean isLoad = false;
+    private boolean mLoading = false; // 防止分页请求重复/竞争
     private boolean isTop = true;
     private View focusedView = null;
     /** 当前网格列数，用于检测"横屏海报"开关变化后是否需要重建 LayoutManager */
@@ -189,7 +190,9 @@ public class GridFragment extends BaseLazyFragment {
         gridAdapter.setOnLoadMoreListener(new BaseQuickAdapter.RequestLoadMoreListener() {
             @Override
             public void onLoadMoreRequested() {
+                if (mLoading) return; // 上一页还在加载中，跳过
                 gridAdapter.setEnableLoadMore(true);
+                mLoading = true;
                 sourceViewModel.getList(sortData, page);
             }
         }, mGridView);
@@ -253,6 +256,14 @@ public class GridFragment extends BaseLazyFragment {
             mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, span));
             if (gridAdapter != null) gridAdapter.notifyDataSetChanged();
         }
+        // 从其他分栏切回来时，兜底重置加载状态，防止之前的请求回调丢失导致永久卡住
+        if (mLoading) {
+            mLoading = false;
+            if (gridAdapter != null) {
+                gridAdapter.loadMoreComplete();
+                gridAdapter.setEnableLoadMore(true);
+            }
+        }
     }
 
     private void initViewModel() {
@@ -264,13 +275,20 @@ public class GridFragment extends BaseLazyFragment {
 //                if(mGridView != null) mGridView.requestFocus();
                 if (absXml != null && absXml.movie != null && absXml.movie.videoList != null && absXml.movie.videoList.size() > 0) {
                     if (page == 1) {
-                        showSuccess();
-                        isLoad = true;
-                        gridAdapter.setNewData(absXml.movie.videoList);
-                        // 写本地缓存，下次打开立即显示
-                        try {
-                            Hawk.put(cacheKey(), GsonUtils.toJson(absXml.movie.videoList));
-                        } catch (Exception ignore) {}
+                        // 如果已经从本地缓存显示过数据，后台返回时只更新缓存文件，不重绘列表（避免卡顿/闪烁）
+                        boolean shownFromCache = isLoad && gridAdapter.getData().size() > 0;
+                        if (shownFromCache) {
+                            try {
+                                Hawk.put(cacheKey(), GsonUtils.toJson(absXml.movie.videoList));
+                            } catch (Exception ignore) {}
+                        } else {
+                            showSuccess();
+                            isLoad = true;
+                            gridAdapter.setNewData(absXml.movie.videoList);
+                            try {
+                                Hawk.put(cacheKey(), GsonUtils.toJson(absXml.movie.videoList));
+                            } catch (Exception ignore) {}
+                        }
                     } else {
                         gridAdapter.addData(absXml.movie.videoList);
                     }
@@ -294,6 +312,7 @@ public class GridFragment extends BaseLazyFragment {
                     }
                     gridAdapter.setEnableLoadMore(false);
                 }
+                mLoading = false;
             }
         });
     }
@@ -330,6 +349,7 @@ public class GridFragment extends BaseLazyFragment {
         if (page == 1 && !isLoad) {
             showLoading();
         }
+        mLoading = true;
         sourceViewModel.getList(sortData, page);
     }
 

@@ -79,7 +79,7 @@ if (-not $apk) {
 }
 
 # --- copy apk into project root with versioned name ---
-$destName = "TVBox-Mobile-v$ver-$buildType.apk"
+$destName = "MBox-v$ver-$buildType.apk"
 $destPath = Join-Path $ScriptDir $destName
 Copy-Item -Path $apk.FullName -Destination $destPath -Force
 
