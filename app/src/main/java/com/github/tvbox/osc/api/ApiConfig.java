@@ -134,14 +134,20 @@ public class ApiConfig {
             return;
         }
         File cache = new File(App.getInstance().getFilesDir().getAbsolutePath() + "/" + MD5.encode(apiUrl));
-        if (useCache && cache.exists()) {
+        // 冷启动也先读本地缓存立即回调，让 UI 快速显示；后台继续下载新配置刷新
+        boolean cacheHitRaw = false;
+        if (cache.exists()) {
             try {
                 parseJson(apiUrl, cache);
                 callback.success();
-                return;
+                cacheHitRaw = true;
             } catch (Throwable th) {
                 th.printStackTrace();
             }
+        }
+        final boolean cacheHit = cacheHitRaw;
+        if (useCache && cacheHit) {
+            return;
         }
         String TempKey = null, configUrl = "", pk = ";pk;";
         if (apiUrl.contains(pk)) {
@@ -184,16 +190,25 @@ public class ApiConfig {
                             } catch (Throwable th) {
                                 th.printStackTrace();
                             }
-                            callback.success();
+                            // 已用本地缓存快速回调过，这里只后台刷新配置，不重复回调 UI
+                            if (!cacheHit) {
+                                callback.success();
+                            }
                         } catch (Throwable th) {
                             th.printStackTrace();
-                            callback.error("解析配置失败");
+                            if (!cacheHit) {
+                                callback.error("解析配置失败");
+                            }
                         }
                     }
 
                     @Override
                     public void onError(Response<String> response) {
                         super.onError(response);
+                        if (cacheHit) {
+                            // 已用本地缓存快速回调过，网络失败不影响 UI
+                            return;
+                        }
                         if (cache.exists()) {
                             try {
                                 parseJson(apiUrl, cache);
