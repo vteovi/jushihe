@@ -72,6 +72,7 @@ cd D:\Doubao\TVBoxOS_Portrait
 | 1.3.10 | **修复 Android14+ 动态广播接收器崩溃**（SecurityException）：targetSdk34 下动态注册 BroadcastReceiver 必须显式指定 RECEIVER_EXPORTED/NOT_EXPORTED，否则 DetailActivity 启动即崩。统一改用 `ContextCompat.registerReceiver(ctx, receiver, filter, ...)`，覆盖 DetailActivity(电量/Home键/遥控器动作3处)、PlayerTitleView(电量)、LocalPlayActivity(电量)。这些都是系统广播或 App 内部广播，用 NOT_EXPORTED |
 | 1.3.11 | **编译补丁**：项目 androidx.core 版本较旧，`ContextCompat.RECEIVER_NOT_EXPORTED` 常量不存在（4参 registerReceiver 方法可用）。直接用字面值 `2 /*RECEIVER_NOT_EXPORTED*/` 代替该常量，5处同步替换，避免升级 core 引发连锁 |
 | 1.3.12 | **编译补丁**：上一步用 PowerShell 写文件误加了 UTF-8 BOM（\ufeff），Java 编译器报"非法字符 \ufeff"。已去除 3 个被改文件（DetailActivity/LocalPlayActivity/PlayerTitleView）的 BOM，改为无 BOM UTF-8。教训：改 Java 文件后用 .NET UTF8Encoding($false) 写，别用 PS5.1 的 -Encoding UTF8（会带 BOM） |
+| 1.3.13 | **编译补丁（终局）**：Portrait 的 androidx.core 太旧，连 `ContextCompat.registerReceiver(ctx,rec,filter,flag)` 4参方法都没有。放弃 ContextCompat，5处全部改用框架 `Context.registerReceiver` + SDK 分支：`if (SDK_INT >= TIRAMISU) registerReceiver(rec,filter,2/*RECEIVER_NOT_EXPORTED*/); else registerReceiver(rec,filter);`。覆盖 DetailActivity(3处:电量/Home键/遥控器动作)、PlayerTitleView(电量,getContext())、LocalPlayActivity(电量)。已补 PlayerTitleView/LocalPlayActivity 的 `import android.os.Build;` |
 
 ## 五、崩溃修复记录（遇到同栈报错先对照这里）
 

@@ -146,7 +146,11 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         initView();
         initViewModel();
         initData();
-        ContextCompat.registerReceiver(this, mBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED), 2 /* RECEIVER_NOT_EXPORTED */);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(mBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED), 2 /*RECEIVER_NOT_EXPORTED*/);
+        } else {
+            registerReceiver(mBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        }
         ImmersionBar.with(this)
                 .statusBarColor(R.color.black)
                 .navigationBarColor(R.color.white)
@@ -297,7 +301,11 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                 }
             };
             // Android 14+ 要求动态注册的接收器显式声明导出标志，否则抛 SecurityException
-            ContextCompat.registerReceiver(this, mHomeKeyReceiver, new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS), 2 /* RECEIVER_NOT_EXPORTED */);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(mHomeKeyReceiver, new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS), 2);
+            } else {
+                registerReceiver(mHomeKeyReceiver, new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS));
+            }
         }
     }
 
@@ -959,7 +967,11 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                     }
                 }
             };
-            ContextCompat.registerReceiver(this, mRemoteActionReceiver, new IntentFilter(IntentKey.BROADCAST_ACTION), 2 /* RECEIVER_NOT_EXPORTED */);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(mRemoteActionReceiver, new IntentFilter(IntentKey.BROADCAST_ACTION), 2);
+            } else {
+                registerReceiver(mRemoteActionReceiver, new IntentFilter(IntentKey.BROADCAST_ACTION));
+            }
         } else {
             if (mRemoteActionReceiver != null) {
                 unregisterReceiver(mRemoteActionReceiver);
