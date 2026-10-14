@@ -1,4 +1,4 @@
-﻿package com.github.tvbox.osc.ui.widget;
+package com.github.tvbox.osc.ui.widget;
 
 import android.app.Activity;
 import android.content.BroadcastReceiver;

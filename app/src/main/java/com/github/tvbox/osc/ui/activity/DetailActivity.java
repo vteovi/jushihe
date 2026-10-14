@@ -1,4 +1,4 @@
-﻿package com.github.tvbox.osc.ui.activity;
+package com.github.tvbox.osc.ui.activity;
 
 import android.annotation.SuppressLint;
 import android.app.PendingIntent;

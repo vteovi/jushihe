@@ -1,4 +1,4 @@
-﻿package com.github.tvbox.osc.ui.activity;
+package com.github.tvbox.osc.ui.activity;
 
 import android.content.Intent;
 import android.content.IntentFilter;
