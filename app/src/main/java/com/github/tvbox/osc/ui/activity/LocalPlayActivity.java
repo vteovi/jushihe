@@ -3,6 +3,7 @@ package com.github.tvbox.osc.ui.activity;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.net.Uri;
+import androidx.core.content.ContextCompat;
 import android.os.Bundle;
 import android.os.Handler;
 
@@ -53,7 +54,7 @@ public class LocalPlayActivity extends BaseVbActivity<ActivityLocalPlayBinding> 
     private BasePopupView mAllSeriesRightDialog;
     @Override
     protected void init() {
-        registerReceiver(mBatteryReceiver,new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        ContextCompat.registerReceiver(this, mBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED);
         mVideoView = mBinding.player;
         mVideoView.startFullScreen();
         Bundle bundle = getIntent().getExtras();
