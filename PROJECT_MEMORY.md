@@ -67,6 +67,7 @@ cd D:\Doubao\TVBoxOS_Portrait
 | 1.3.5 | **grid 分页竞争三连修复**（对齐 Mobile e8a7dd3/21bb95a/0f7df3d）：①新增 `mLoading` 标志，onLoadMore/initData 发起请求前置位、onChanged 回调结束复位，防止缓存秒开后用户快速下滑触发重复 page-1 请求导致分页错乱；②onFragmentResume 兜底重置 mLoading 并恢复 load-more，防止切 tab 后回调丢失导致上拉加载永久卡死；③第一页已从缓存显示时，后台网络返回只更新缓存不 setNewData 重绘列表，避免重绑 item/重载海报造成的滚动卡顿 |
 | 1.3.6 | **快速滑动海报残留修复**（GridAdapter）：绑定数据时先 `ivThumb.setImageDrawable(null)` 清空旧图再加载新海报，配合已去掉的 .placeholder()，防止 RecyclerView 快速复用时短暂显示上一个位置的旧海报 |
 | 1.3.7 | **消除 MIUI 安装"缺少隐私政策"红色风险提示**：根因是 targetSdkVersion 30 低于 Android 12(API31) 隐私合规线，MIUI 增强防护扫包时判定未适配隐私合规而弹红警；Mobile 为 34 故不弹。将 targetSdkVersion 30→34，并补 `FOREGROUND_SERVICE_MEDIA_PLAYBACK` 权限（播放服务已声明 mediaPlayback 类型，targetSdk34 必须显式声明）。注：未加 POST_NOTIFICATIONS（运行时通知权限，不影响安装提示） |
+| 1.3.8 | **targetSdk34 编译补丁**：Android 12+ 要求带 intent-filter 的组件显式声明 `android:exported`，否则 processReleaseMainManifest 失败。给 SearchReceiver/CustomWebReceiver 补 `android:exported="false"`（与 Mobile 一致，自定义 action 仅内部通信）；已核对全 Manifest 所有 activity/receiver/service/provider 均已声明 exported |
 
 ## 五、崩溃修复记录（遇到同栈报错先对照这里）
 

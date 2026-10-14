@@ -98,12 +98,14 @@
 
         <service android:name="com.android.cast.dlna.dmc.DLNACastService"/>
 
-        <receiver android:name=".receiver.SearchReceiver">
+        <receiver android:name=".receiver.SearchReceiver"
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.content.movie.search.Action" />
             </intent-filter>
         </receiver>
-        <receiver android:name=".receiver.CustomWebReceiver">
+        <receiver android:name=".receiver.CustomWebReceiver"
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.content.movie.custom.web.Action" />
             </intent-filter>
