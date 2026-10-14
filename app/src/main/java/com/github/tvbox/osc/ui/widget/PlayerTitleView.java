@@ -1,4 +1,4 @@
-package com.github.tvbox.osc.ui.widget;
+﻿package com.github.tvbox.osc.ui.widget;
 
 import android.app.Activity;
 import android.content.BroadcastReceiver;
@@ -98,7 +98,7 @@ public class PlayerTitleView extends FrameLayout implements IControlComponent {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         if (!mIsRegister) {
-            ContextCompat.registerReceiver(getContext(), mBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED);
+            ContextCompat.registerReceiver(getContext(), mBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED), 2 /* RECEIVER_NOT_EXPORTED */);
             mIsRegister = true;
         }
     }

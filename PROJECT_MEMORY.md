@@ -69,7 +69,8 @@ cd D:\Doubao\TVBoxOS_Portrait
 | 1.3.7 | **消除 MIUI 安装"缺少隐私政策"红色风险提示**：根因是 targetSdkVersion 30 低于 Android 12(API31) 隐私合规线，MIUI 增强防护扫包时判定未适配隐私合规而弹红警；Mobile 为 34 故不弹。将 targetSdkVersion 30→34，并补 `FOREGROUND_SERVICE_MEDIA_PLAYBACK` 权限（播放服务已声明 mediaPlayback 类型，targetSdk34 必须显式声明）。注：未加 POST_NOTIFICATIONS（运行时通知权限，不影响安装提示） |
 | 1.3.8 | **targetSdk34 编译补丁**：Android 12+ 要求带 intent-filter 的组件显式声明 `android:exported`，否则 processReleaseMainManifest 失败。给 SearchReceiver/CustomWebReceiver 补 `android:exported="false"`（与 Mobile 一致，自定义 action 仅内部通信）；已核对全 Manifest 所有 activity/receiver/service/provider 均已声明 exported |
 | 1.3.9 | **改应用包名绕开 MIUI 风险标记**：提 targetSdk34 后仍弹"缺少隐私政策"红警，根因是 MIUI 云端风险库按包名标记了 TVBox 原版包名 `com.github.tvbox.osc`（签名同为 TVBoxOSC.jks、targetSdk 已对齐，唯一差异是包名；Mobile 用 .mobile 不弹）。将 applicationId 改为 `com.github.tvbox.osc.portrait`（与 .mobile 区分、两 App 可并存）；Manifest 的 package/R 类包名仍为 com.github.tvbox.osc，代码 import 无需改，FileProvider authorities 用 `${applicationId}.fileprovider` 自动跟随。注意：新包名=全新 App，需卸载旧版重装并重新导入订阅源 |
-| 1.3.10 | **修复 Android14+ 动态广播接收器崩溃**（SecurityException）：targetSdk34 下动态注册 BroadcastReceiver 必须显式指定 RECEIVER_EXPORTED/NOT_EXPORTED，否则 DetailActivity 启动即崩。统一改用 `ContextCompat.registerReceiver(ctx, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)`（androidx 兼容、minSdk24 可用），覆盖 DetailActivity(电量/Home键/遥控器动作3处)、PlayerTitleView(电量)、LocalPlayActivity(电量)。这些都是系统广播或 App 内部广播，用 NOT_EXPORTED |
+| 1.3.10 | **修复 Android14+ 动态广播接收器崩溃**（SecurityException）：targetSdk34 下动态注册 BroadcastReceiver 必须显式指定 RECEIVER_EXPORTED/NOT_EXPORTED，否则 DetailActivity 启动即崩。统一改用 `ContextCompat.registerReceiver(ctx, receiver, filter, ...)`，覆盖 DetailActivity(电量/Home键/遥控器动作3处)、PlayerTitleView(电量)、LocalPlayActivity(电量)。这些都是系统广播或 App 内部广播，用 NOT_EXPORTED |
+| 1.3.11 | **编译补丁**：项目 androidx.core 版本较旧，`ContextCompat.RECEIVER_NOT_EXPORTED` 常量不存在（4参 registerReceiver 方法可用）。直接用字面值 `2 /*RECEIVER_NOT_EXPORTED*/` 代替该常量，5处同步替换，避免升级 core 引发连锁 |
 
 ## 五、崩溃修复记录（遇到同栈报错先对照这里）
 

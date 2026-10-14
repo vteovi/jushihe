@@ -1,4 +1,4 @@
-package com.github.tvbox.osc.ui.activity;
+﻿package com.github.tvbox.osc.ui.activity;
 
 import android.annotation.SuppressLint;
 import android.app.PendingIntent;
@@ -146,7 +146,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         initView();
         initViewModel();
         initData();
-        ContextCompat.registerReceiver(this, mBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED);
+        ContextCompat.registerReceiver(this, mBatteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED), 2 /* RECEIVER_NOT_EXPORTED */);
         ImmersionBar.with(this)
                 .statusBarColor(R.color.black)
                 .navigationBarColor(R.color.white)
@@ -297,7 +297,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                 }
             };
             // Android 14+ 要求动态注册的接收器显式声明导出标志，否则抛 SecurityException
-            ContextCompat.registerReceiver(this, mHomeKeyReceiver, new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS), ContextCompat.RECEIVER_NOT_EXPORTED);
+            ContextCompat.registerReceiver(this, mHomeKeyReceiver, new IntentFilter(Intent.ACTION_CLOSE_SYSTEM_DIALOGS), 2 /* RECEIVER_NOT_EXPORTED */);
         }
     }
 
@@ -959,7 +959,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                     }
                 }
             };
-            ContextCompat.registerReceiver(this, mRemoteActionReceiver, new IntentFilter(IntentKey.BROADCAST_ACTION), ContextCompat.RECEIVER_NOT_EXPORTED);
+            ContextCompat.registerReceiver(this, mRemoteActionReceiver, new IntentFilter(IntentKey.BROADCAST_ACTION), 2 /* RECEIVER_NOT_EXPORTED */);
         } else {
             if (mRemoteActionReceiver != null) {
                 unregisterReceiver(mRemoteActionReceiver);
