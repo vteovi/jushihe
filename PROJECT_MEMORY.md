@@ -65,6 +65,7 @@ cd D:\Doubao\TVBoxOS_Portrait
 | 1.3.3 | **打开秒开加速**（移植 Mobile launch 系列提交）：①GridFragment 每个 Tab 第一页视频列表按 `grid_cache_{sourceKey}_{sortId}` 缓存到 Hawk，打开时先读缓存立即渲染、后台静默拉新替换，有缓存不转圈；②HomeFragment 分栏 tabs 及主页推荐列表按 `sort_cache_{sourceKey}`(+`_rec`) 缓存，config/jar 就绪后先读缓存立即建 ViewPager，不等 sort 网络请求；后台 sort 返回若分栏 id 序列与已渲染一致则跳过 initViewPager()，避免跳顶/闪烁；③Grid/Collect/History/FastSearch/Search 五个图片 adapter 去掉 `.placeholder()`，缓存海报直接解码显示，error 仍回退加载图 |
 | 1.3.4 | **在线订阅源冷启动先读缓存**（ApiConfig.loadConfig）：不再只在配置重载(useCache)时读缓存，冷启动只要本地有缓存配置文件（filesDir/MD5(apiUrl)）就先 parseJson 并立即 callback.success() 让 UI 秒开；随后后台继续下载最新配置，成功只更新内存+缓存文件、不重复回调 UI，失败也不报错（已用缓存显示）。useCache=true（配置变更）场景行为不变。与 1.3.3 的 sort/列表缓存衔接成完整秒开链路：配置秒开→分栏秒渲染→列表秒显示 |
 | 1.3.5 | **grid 分页竞争三连修复**（对齐 Mobile e8a7dd3/21bb95a/0f7df3d）：①新增 `mLoading` 标志，onLoadMore/initData 发起请求前置位、onChanged 回调结束复位，防止缓存秒开后用户快速下滑触发重复 page-1 请求导致分页错乱；②onFragmentResume 兜底重置 mLoading 并恢复 load-more，防止切 tab 后回调丢失导致上拉加载永久卡死；③第一页已从缓存显示时，后台网络返回只更新缓存不 setNewData 重绘列表，避免重绑 item/重载海报造成的滚动卡顿 |
+| 1.3.6 | **快速滑动海报残留修复**（GridAdapter）：绑定数据时先 `ivThumb.setImageDrawable(null)` 清空旧图再加载新海报，配合已去掉的 .placeholder()，防止 RecyclerView 快速复用时短暂显示上一个位置的旧海报 |
 
 ## 五、崩溃修复记录（遇到同栈报错先对照这里）
 
