@@ -75,6 +75,7 @@ cd D:\Doubao\TVBoxOS_Portrait
 | 1.3.13 | **编译补丁（终局）**：Portrait 的 androidx.core 太旧，连 `ContextCompat.registerReceiver(ctx,rec,filter,flag)` 4参方法都没有。放弃 ContextCompat，5处全部改用框架 `Context.registerReceiver` + SDK 分支：`if (SDK_INT >= TIRAMISU) registerReceiver(rec,filter,2/*RECEIVER_NOT_EXPORTED*/); else registerReceiver(rec,filter);`。覆盖 DetailActivity(3处:电量/Home键/遥控器动作)、PlayerTitleView(电量,getContext())、LocalPlayActivity(电量)。已补 PlayerTitleView/LocalPlayActivity 的 `import android.os.Build;` |
 | 1.3.14 | **改名**：应用显示名 app_name 由 "MBox" 改为「聚视盒」（仅改 res/values/strings.xml 的 app_name，桌面图标名、首页 fragment_home、我的页 fragment_my 均引用该 string，自动跟随） |
 | 1.4.0 | **改包名**：applicationId 由 com.github.tvbox.osc.portrait 改为 `com.jushihe.tvbox`。manifest 的 package="com.github.tvbox.osc"（代码包名/相对类名解析用）保持不动；FileProvider authorities 用 `${applicationId}.fileprovider` 占位符自动跟随，无需改。注意：包名变了，与旧包不可覆盖升级，需先卸载旧版再装 |
+| 1.4.1 | **UI修复**："我的"页顶部"聚视盒"文字被状态栏白条遮挡。竖屏手机状态栏比横屏 TV 高，原 marginTop 40dp 不够，改为 48dp |
 
 ## 五、崩溃修复记录（遇到同栈报错先对照这里）
 
