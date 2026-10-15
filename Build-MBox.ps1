@@ -1,92 +1,93 @@
-﻿<#
-============================================================================
-  Build-MBox.ps1 —— 一键编译 聚视盒 APK 并保存到项目目录
-  右键 → 使用 PowerShell 运行 即可，结束后窗口会停留不闪退
-============================================================================
-  用法：
-    右键“使用 PowerShell 运行”本脚本（默认编译 Release）
-    或在 PowerShell 中：
-      .\Build-MBox.ps1                  # Release
-      .\Build-MBox.ps1 -Debug           # Debug
-      .\Build-MBox.ps1 -OutDir D:\apk   # 指定输出目录
-============================================================================
-#>
+﻿# ============================================================
+#  聚视盒 APK Builder
+#  右键“使用 PowerShell 运行”即可
+# ============================================================
 
-param(
-    [switch]$Debug,
-    [string]$OutDir = '',
-    [switch]$SkipJavaClean
-)
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+Set-Location $ScriptDir
 
-$ErrorActionPreference = 'Stop'
-$root = $PSScriptRoot
-if (-not $root) { $root = (Get-Location).Path }
-Set-Location $root
+$env:JAVA_HOME    = 'C:\Java\jdk-17'
+$env:ANDROID_HOME = 'C:\Android\Sdk'
 
-try {
-    if (-not (Test-Path (Join-Path $root 'gradlew.bat'))) {
-        Write-Host "!! 未在 $root 找到 gradlew.bat" -ForegroundColor Red
-        exit 1
-    }
+Write-Host '============================================'
+Write-Host '   聚视盒 APK Builder'
+Write-Host '============================================'
 
-    $buildType = if ($Debug) { 'debug' } else { 'release' }
-    $taskName  = 'assemble' + $buildType.Substring(0, 1).ToUpper() + $buildType.Substring(1)
-    $outDir    = if ($OutDir -ne '') { $OutDir } else { Join-Path $root 'APK' }
-    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
-
-    Write-Host ''
-    Write-Host '==============================================' -ForegroundColor Cyan
-    Write-Host "  聚视盒编译任务 : $taskName" -ForegroundColor Cyan
-    Write-Host "  输出目录       : $outDir" -ForegroundColor Cyan
-    Write-Host '==============================================' -ForegroundColor Cyan
-    Write-Host ''
-
-    Write-Host "==> 开始编译，首次运行需下载依赖，请耐心等待 ..." -ForegroundColor Yellow
-    & .\gradlew.bat $taskName --no-daemon
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "!! 编译失败（gradle 退出码: $LASTEXITCODE）" -ForegroundColor Red
-        exit $LASTEXITCODE
-    }
-
-    $apkDir = Join-Path $root "app\build\outputs\apk\$buildType"
-    $apk = Get-ChildItem -Path $apkDir -Filter '*.apk' -ErrorAction SilentlyContinue |
-           Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if (-not $apk) {
-        Write-Host "!! 编译完成但未在 $apkDir 找到 APK" -ForegroundColor Red
-        exit 1
-    }
-
-    $dest = Join-Path $outDir $apk.Name
-    Copy-Item $apk.FullName $dest -Force
-    Write-Host ''
-    Write-Host "==> APK 已保存到: $dest" -ForegroundColor Green
-    Write-Host ("    大小: {0:N1} MB" -f ($apk.Length / 1MB))
-
-    if (-not $SkipJavaClean) {
-        Write-Host ''
-        Write-Host '==> 清理残留 Java 进程 ...' -ForegroundColor Yellow
-        $killed = 0
-        try {
-            $javaProcs = Get-CimInstance Win32_Process -Filter "Name='java.exe'" -ErrorAction Stop
-            foreach ($p in $javaProcs) {
-                if ($p.CommandLine -match 'gradle|kotlin') {
-                    try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop; $killed++ } catch {}
-                }
-            }
-        } catch {}
-        Write-Host "    共清理 $killed 个进程" -ForegroundColor Green
-    }
-
-    Write-Host ''
-    Write-Host '========== 编译完成 ==========' -ForegroundColor Green
-    Write-Host "  APK: $dest" -ForegroundColor Green
-    Write-Host '==============================' -ForegroundColor Green
+# --- prerequisite checks ---
+if (-not (Test-Path 'gradlew.bat')) {
+    Write-Host '[ERROR] gradlew.bat not found.'
+    Read-Host 'Press Enter to exit'; exit 1
 }
-catch {
-    Write-Host ''
-    Write-Host "!! 脚本出错: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
+if (-not (Test-Path "$env:JAVA_HOME\bin\java.exe")) {
+    Write-Host "[ERROR] JDK 17 not found at $env:JAVA_HOME"
+    Read-Host 'Press Enter to exit'; exit 1
 }
+
+# --- read version name ---
+$ver = 'unknown'
+$bg = Get-Content 'app\build.gradle' -Raw
+if ($bg -match "versionName\s+'([^']+)'") { $ver = $Matches[1] }
+Write-Host "  Project version: $ver"
+
+# --- pick build type ---
+$buildType = $args[0]
+if (($buildType -ne 'debug') -and ($buildType -ne 'release')) {
+    Write-Host ''
+    Write-Host '  Select build type:'
+    Write-Host '    [1] Debug   - for daily testing'
+    Write-Host '    [2] Release - signed, for install and share'
+    $choice = Read-Host '  Enter 1 or 2'
+    if ($choice -eq '2') { $buildType = 'release' } else { $buildType = 'debug' }
+}
+
+# --- stop leftover gradle daemon ---
+& .\gradlew.bat --stop 2>$null
 
 Write-Host ''
-Read-Host '按回车键关闭窗口'
+Write-Host '============================================'
+Write-Host "  Building $buildType APK, please wait..."
+Write-Host '============================================'
+Write-Host ''
+
+if ($buildType -eq 'release') {
+    & .\gradlew.bat assembleRelease --console=plain
+} else {
+    & .\gradlew.bat assembleDebug --console=plain
+}
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ''
+    Write-Host '============================================'
+    Write-Host '  BUILD FAILED - check errors above'
+    Write-Host '============================================'
+    & .\gradlew.bat --stop 2>$null
+    Read-Host 'Press Enter to exit'; exit 1
+}
+
+# --- locate produced apk ---
+$outDir = Join-Path 'app\build\outputs\apk' $buildType
+$apk = Get-ChildItem -Path "$outDir\*.apk" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $apk) {
+    Write-Host "  [WARN] APK not found in $outDir"
+    & .\gradlew.bat --stop 2>$null
+    Read-Host 'Press Enter to exit'; exit 1
+}
+
+# --- copy apk to project root ---
+$destName = "JushiHe-v$ver-$buildType.apk"
+$destPath = Join-Path $ScriptDir $destName
+Copy-Item -Path $apk.FullName -Destination $destPath -Force
+
+Write-Host ''
+Write-Host '============================================'
+Write-Host '  BUILD SUCCESS'
+Write-Host '============================================'
+Write-Host "  Size      : $([math]::Round($apk.Length/1MB, 1)) MB"
+Write-Host "  Copied to : $destPath"
+
+# --- clean up gradle daemon ---
+& .\gradlew.bat --stop 2>$null
+
+Write-Host ''
+Read-Host 'Press Enter to exit'
+exit 0
