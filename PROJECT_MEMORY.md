@@ -77,6 +77,9 @@ cd D:\Doubao\TVBoxOS_Portrait
 | 1.4.0 | **改包名**：applicationId 由 com.github.tvbox.osc.portrait 改为 `com.jushihe.tvbox`。manifest 的 package="com.github.tvbox.osc"（代码包名/相对类名解析用）保持不动；FileProvider authorities 用 `${applicationId}.fileprovider` 占位符自动跟随，无需改。注意：包名变了，与旧包不可覆盖升级，需先卸载旧版再装 |
 | 1.4.1 | **UI修复**："我的"页顶部"聚视盒"文字被状态栏白条遮挡。竖屏手机状态栏比横屏 TV 高，原 marginTop 40dp 不够，改为 48dp |
 | 1.4.2 | **构建脚本**：Build-MBox.ps1 末尾加 Read-Host 暂停 + try/catch，右键用 PowerShell 运行不再闪退，出错也能看到错误信息 |
+| 1.4.3 | **构建脚本**：新增 `编译聚视盒.bat` 双击启动器，用 `-ExecutionPolicy Bypass` 绕过 PowerShell 执行策略限制 |
+| 1.4.4 | **构建脚本**：Build-MBox.ps1 参照 build_apk.ps1 重写：硬编码 JAVA_HOME/ANDROID_HOME，每处退出都 Read-Host，去掉 param() 和 ErrorActionPreference=Stop |
+| 1.4.5 | **UI修复**："我的"页顶部间距问题改用 `android:fitsSystemWindows="true"`（自动按状态栏真实高度留间距），去掉手动 marginTop，不再靠猜 dp 值 |
 
 ## 五、崩溃修复记录（遇到同栈报错先对照这里）
 
