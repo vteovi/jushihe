@@ -159,6 +159,7 @@ public class VodController extends BaseController {
     int videoPlayState = 0;
     LockRunnable lockRunnable = new LockRunnable();
     private boolean isLock = false;
+    private boolean isFullScreenState = false; // 是否全屏状态
     private ParseAdapter mParseAdapter;
 
     private Runnable myRunnable2 = new Runnable() {
@@ -1035,6 +1036,20 @@ public class VodController extends BaseController {
             hideBottom();
         }
         return true;
+    }
+
+    public void setFullScreenState(boolean full) {
+        this.isFullScreenState = full;
+    }
+
+    @Override
+    public boolean onDoubleTap(MotionEvent e) {
+        // 非全屏时双击进入全屏，全屏时双击暂停/播放
+        if (!isFullScreenState && listener != null) {
+            listener.toggleFullScreen();
+            return true;
+        }
+        return super.onDoubleTap(e);
     }
 
     @Override

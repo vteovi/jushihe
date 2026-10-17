@@ -409,6 +409,7 @@ public class PlayFragment extends BaseLazyFragment {
         }
 
         mController.changedLandscape(fullWindows);
+        mController.setFullScreenState(fullWindows);
     }
 
     //设置字幕
