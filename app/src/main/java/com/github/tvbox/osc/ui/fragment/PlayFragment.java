@@ -1655,6 +1655,29 @@ public class PlayFragment extends BaseLazyFragment {
         return TextUtils.isEmpty(mCurrentUrl) || !RegexUtils.isURL(mCurrentUrl) ?"":mCurrentUrl;
     }
 
+    public void playExternal(int playerType) {
+        if (mVodInfo == null || mVodInfo.seriesMap.get(mVodInfo.playFlag) == null
+                || mVodInfo.seriesMap.get(mVodInfo.playFlag).size() <= mVodInfo.playIndex) {
+            ToastUtils.showShort("暂无可播放的集数");
+            return;
+        }
+        String url = getFinalUrl();
+        if (TextUtils.isEmpty(url)) {
+            try {
+                url = mVodInfo.seriesMap.get(mVodInfo.playFlag).get(mVodInfo.playIndex).url;
+            } catch (Throwable th) { }
+        }
+        if (TextUtils.isEmpty(url)) {
+            ToastUtils.showShort("请先播放预览后再用外部播放器");
+            return;
+        }
+        VodInfo.VodSeries vs = mVodInfo.seriesMap.get(mVodInfo.playFlag).get(mVodInfo.playIndex);
+        String playTitle = mVodInfo.name + " " + vs.name;
+        long progress = getSavedProgress(progressKey);
+        boolean ok = PlayerHelper.runExternalPlayer(playerType, requireActivity(), url, playTitle, playSubtitle, webHeaderMap, progress);
+        ToastUtils.showShort(ok ? "已调用 " + PlayerHelper.getPlayerName(playerType) : "调用失败, 请确认已安装 " + PlayerHelper.getPlayerName(playerType));
+    }
+
     boolean checkVideoFormat(String url) {
         try {
             if (url.contains("url=http") || url.contains(".html")) {

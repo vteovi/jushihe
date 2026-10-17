@@ -211,6 +211,20 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                 sortSeries();
             }
         });
+        // 投屏按钮
+        mBinding.tvCast.setOnClickListener(v -> {
+            FastClickCheckUtil.check(v);
+            showCastDialog();
+        });
+        // 外部播放按钮
+        mBinding.tvExternalPlay.setOnClickListener(v -> {
+            FastClickCheckUtil.check(v);
+            if (playFragment == null) {
+                ToastUtils.showShort("请开启预览后再用外部播放器");
+                return;
+            }
+            playFragment.playExternal(0);
+        });
         // 画中画按钮
         mBinding.extPip.setOnClickListener(v -> {
             FastClickCheckUtil.check(v);
