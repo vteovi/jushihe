@@ -26,6 +26,7 @@ import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
 import com.github.tvbox.osc.ui.dialog.BackupDialog
 import com.github.tvbox.osc.ui.dialog.LiveApiDialog
 import com.github.tvbox.osc.ui.dialog.SelectDialog
+import com.github.tvbox.osc.util.BackupManager
 import com.github.tvbox.osc.util.FastClickCheckUtil
 import com.github.tvbox.osc.util.FileUtils
 import com.github.tvbox.osc.util.HawkConfig
@@ -442,10 +443,10 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
     // ============ 数据备份/还原（系统文件选择器，无需存储权限） ============
 
     private fun startBackupSaf() {
-        val name = "MBox备份-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date())}.zip"
+        val name = "MBox备份-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date())}.json"
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = "application/zip"
+            type = "application/json"
             putExtra(Intent.EXTRA_TITLE, name)
         }
         startActivityForResult(intent, REQ_BACKUP)
@@ -455,7 +456,7 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
-            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/octet-stream"))
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "application/octet-stream"))
         }
         startActivityForResult(intent, REQ_RESTORE)
     }
@@ -470,99 +471,44 @@ class SettingActivity : BaseVbActivity<ActivitySettingBinding>() {
         }
     }
 
-    /** 读取 Hawk2 / crypto.KEY_256 全部配置为 JSON 字符串 */
-    private fun buildHawkJson(): String {
-        val jsonObject = JSONObject()
-        var sp = App.getInstance().getSharedPreferences("Hawk2", Context.MODE_PRIVATE)
-        for (key in sp.all.keys) {
-            jsonObject.put(key, sp.getString(key, ""))
-        }
-        sp = App.getInstance().getSharedPreferences("crypto.KEY_256", Context.MODE_PRIVATE)
-        for (key in sp.all.keys) {
-            jsonObject.put(key, sp.getString(key, ""))
-        }
-        return jsonObject.toString()
-    }
-
-    /** 把 JSON 写回 Hawk2 / crypto.KEY_256 */
-    private fun restoreHawkJson(hawkJson: String) {
-        val jsonObject = JSONObject(hawkJson)
-        val it = jsonObject.keys()
-        val sharedPreferences = App.getInstance().getSharedPreferences("Hawk2", Context.MODE_PRIVATE)
-        while (it.hasNext()) {
-            val key = it.next()
-            val value = jsonObject.getString(key)
-            if (key == "cipher_key") {
-                App.getInstance().getSharedPreferences("crypto.KEY_256", Context.MODE_PRIVATE)
-                    .edit().putString(key, value).commit()
-            } else {
-                sharedPreferences.edit().putString(key, value).commit()
-            }
-        }
-    }
-
-    /** 备份：sqlite + hawk 打包为 zip 写入系统文件选择器选中的位置 */
+    /** 备份：导出 JSON 到系统文件选择器选中的位置 */
     private fun doBackupSaf(uri: Uri) {
         try {
-            val dbTmp = File(cacheDir, "backup_sqlite_tmp")
-            if (!AppDataManager.backup(dbTmp)) {
-                ToastUtils.showShort("DB备份失败")
+            val tmpFile = File(cacheDir, "mbox_backup_tmp.json")
+            if (!BackupManager.exportBackup(tmpFile)) {
+                ToastUtils.showShort("备份失败")
                 return
             }
-            val hawkJson = buildHawkJson()
             contentResolver.openOutputStream(uri)?.use { out ->
-                ZipOutputStream(BufferedOutputStream(out)).use { zip ->
-                    zip.putNextEntry(ZipEntry("sqlite"))
-                    FileInputStream(dbTmp).use { it.copyTo(zip) }
-                    zip.closeEntry()
-                    zip.putNextEntry(ZipEntry("hawk"))
-                    zip.write(hawkJson.toByteArray(Charsets.UTF_8))
-                    zip.closeEntry()
-                }
+                FileInputStream(tmpFile).use { it.copyTo(out) }
             }
             ToastUtils.showShort("备份成功")
         } catch (e: Exception) {
             LOG.e(e)
             ToastUtils.showShort("备份失败:" + e.message)
+        } finally {
+            File(cacheDir, "mbox_backup_tmp.json").delete()
         }
     }
 
-    /** 恢复：读取 zip，解出 sqlite + hawk 并恢复 */
+    /** 恢复：读取 JSON 并恢复收藏、历史、设置 */
     private fun doRestoreSaf(uri: Uri) {
+        val tmpFile = File(cacheDir, "mbox_restore_tmp.json")
         try {
-            val dbTmp = File(cacheDir, "restore_sqlite_tmp")
-            var hawkJson: String? = null
             contentResolver.openInputStream(uri)?.use { input ->
-                ZipInputStream(BufferedInputStream(input)).use { zip ->
-                    var entry = zip.nextEntry
-                    while (entry != null) {
-                        when (entry.name) {
-                            "sqlite" -> FileOutputStream(dbTmp).use { zip.copyTo(it) }
-                            "hawk" -> hawkJson = zip.readBytes().decodeToString()
-                        }
-                        zip.closeEntry()
-                        entry = zip.nextEntry
-                    }
-                }
+                FileOutputStream(tmpFile).use { input.copyTo(it) }
             }
-            if (!dbTmp.exists()) {
-                ToastUtils.showShort("备份文件不包含数据库")
-                return
+            if (BackupManager.importBackup(tmpFile)) {
+                ToastUtils.showShort("恢复成功,即将重启应用")
+                Handler(Looper.getMainLooper()).postDelayed({ AppUtils.relaunchApp(true) }, 2000)
+            } else {
+                ToastUtils.showShort("恢复失败:文件格式错误")
             }
-            if (hawkJson.isNullOrEmpty()) {
-                ToastUtils.showShort("备份文件不包含配置数据")
-                return
-            }
-            if (!AppDataManager.restore(dbTmp)) {
-                ToastUtils.showShort("DB文件恢复失败")
-                return
-            }
-            restoreHawkJson(hawkJson!!)
-            ToastUtils.showShort("恢复成功,即将重启应用")
-            Handler(Looper.getMainLooper()).postDelayed({ AppUtils.relaunchApp(true) }, 2000)
         } catch (e: Exception) {
             LOG.e(e)
             ToastUtils.showShort("恢复失败:" + e.message)
+        } finally {
+            tmpFile.delete()
         }
     }
 

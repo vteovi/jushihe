@@ -113,6 +113,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     private SourceViewModel sourceViewModel;
     private Movie.Video mVideo;
     private VodInfo vodInfo;
+    private boolean isCollected = false;
     public SeriesFlagAdapter seriesFlagAdapter;
     public SeriesAdapter seriesAdapter;
     public String vodId;
@@ -210,22 +211,37 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                 sortSeries();
             }
         });
-        mBinding.tvCast.setOnClickListener(v -> {
-            showCastDialog();
+        // 画中画按钮
+        mBinding.extPip.setOnClickListener(v -> {
+            FastClickCheckUtil.check(v);
+            enterPip();
+        });
+        // 设置按钮
+        mBinding.extSetting.setOnClickListener(v -> {
+            FastClickCheckUtil.check(v);
+            if (playFragment != null && playFragment.getController() != null) {
+                android.view.View settingBtn = playFragment.getController().findViewById(R.id.setting);
+                if (settingBtn != null) settingBtn.performClick();
+            }
+        });
+        // 全屏按钮
+        mBinding.extFullscreen.setOnClickListener(v -> {
+            FastClickCheckUtil.check(v);
+            toggleFullPreview();
         });
         mBinding.tvCollect.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String text = mBinding.tvCollect.getText().toString();
-                if ("加入收藏".equals(text)) {
-                    RoomDataManger.insertVodCollect(sourceKey, vodInfo);
-                    Toast.makeText(DetailActivity.this, "已加入收藏夹", Toast.LENGTH_SHORT).show();
-                    mBinding.tvCollect.setText("取消收藏");
-                } else {
+                if (isCollected) {
                     RoomDataManger.deleteVodCollect(sourceKey, vodInfo);
                     Toast.makeText(DetailActivity.this, "已移除收藏夹", Toast.LENGTH_SHORT).show();
-                    mBinding.tvCollect.setText("加入收藏");
+                    isCollected = false;
+                } else {
+                    RoomDataManger.insertVodCollect(sourceKey, vodInfo);
+                    Toast.makeText(DetailActivity.this, "已加入收藏夹", Toast.LENGTH_SHORT).show();
+                    isCollected = true;
                 }
+                updateCollectIcon();
             }
         });
 
@@ -576,12 +592,14 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             showLoading();
             sourceViewModel.getDetail(sourceKey, vodId);
             boolean isVodCollect = RoomDataManger.isVodCollect(sourceKey, vodId);
-            if (isVodCollect) {
-                mBinding.tvCollect.setText("取消收藏");
-            } else {
-                mBinding.tvCollect.setText("加入收藏");
-            }
+            isCollected = isVodCollect;
+            updateCollectIcon();
         }
+    }
+
+    private void updateCollectIcon() {
+        int color = isCollected ? 0xFFFF4081 : getResources().getColor(R.color.text_foreground);
+        mBinding.tvCollect.setColorFilter(color);
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -827,6 +845,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         mBinding.previewPlayer.setLayoutParams(fullWindows ? windowsFull : windowsPreview);
         mBinding.mGridView.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
         mBinding.mGridViewFlag.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
+        findViewById(R.id.actionBtnBar).setVisibility(fullWindows ? View.GONE : View.VISIBLE);
 
         //全屏下禁用详情页几个按键的焦点 防止上键跑过来
         mBinding.tvSort.setFocusable(!fullWindows);
