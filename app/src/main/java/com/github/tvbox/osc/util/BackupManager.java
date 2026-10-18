@@ -2,6 +2,8 @@ package com.github.tvbox.osc.util;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.Uri;
+import android.util.Base64;
 
 import com.github.tvbox.osc.base.App;
 import com.github.tvbox.osc.bean.Subscription;
@@ -15,9 +17,14 @@ import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
 import com.orhanobut.hawk.Hawk;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.InputStream;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +35,7 @@ import java.util.Map;
  */
 public class BackupManager {
 
+    // 要备份的 Hawk key 列表
     private static final String[] BACKUP_KEYS = {
             HawkConfig.API_URL,
             HawkConfig.LIVE_URL,
@@ -62,19 +70,26 @@ public class BackupManager {
             HawkConfig.BACKGROUND_PLAY_TYPE,
             HawkConfig.VIDEO_PURIFY,
             HawkConfig.VIDEO_SPEED,
+            HawkConfig.WALLPAPER_URL,
+            HawkConfig.WALLPAPER_HISTORY,
             HawkConfig.HISTORY_SEARCH,
+            HawkConfig.POSTER_SIZE,
             HawkConfig.LANDSCAPE_CARD,
             HawkConfig.SHOW_PREVIEW,
             HawkConfig.DEBUG_OPEN
     };
 
+    /**
+     * 导出备份到 JSON 文件
+     */
     public static boolean exportBackup(File outFile) {
         try {
             JsonObject root = new JsonObject();
             root.addProperty("version", 1);
-            root.addProperty("app", "MBox");
+            root.addProperty("app", "TVBoxOS-Mobile");
             root.addProperty("exportTime", System.currentTimeMillis());
 
+            // 1. 收藏列表
             List<VodCollect> collects = AppDataManager.get().getVodCollectDao().getAll();
             JsonArray collectArr = new JsonArray();
             for (VodCollect c : collects) {
@@ -88,6 +103,7 @@ public class BackupManager {
             }
             root.add("collects", collectArr);
 
+            // 2. 历史记录
             List<VodRecord> records = AppDataManager.get().getVodRecordDao().getAll(100000);
             JsonArray recordArr = new JsonArray();
             for (VodRecord r : records) {
@@ -100,14 +116,33 @@ public class BackupManager {
             }
             root.add("records", recordArr);
 
+            // 3. Hawk 设置
             JsonObject settings = new JsonObject();
+            // 本地(文件/ content)配置内容池: key=原 url, value=base64 文件内容。
+            // 设备间同步/换机时, 仅 URL 字符串无法跨设备使用(指向发送端私有路径), 必须把文件内容一起带走, 接收端据此重建私有文件。
+            // 覆盖: 订阅源(SUBSCRIPTIONS)、当前影视源(API_URL)、直播源(LIVE_URL) 等本地文件型配置。
+            JsonObject localFiles = null;
             SharedPreferences sp = App.getInstance().getSharedPreferences("Hawk", Context.MODE_PRIVATE);
             Map<String, ?> all = sp.getAll();
             for (String key : BACKUP_KEYS) {
                 if (key.equals(HawkConfig.SUBSCRIPTIONS)) {
+                    // 订阅源是 List<Subscription>: 用 Hawk 取出真实对象后再 Gson 序列化为
+                    // "字符串"写入(不要直接 add JsonArray, 否则导入端 getAsString() 会抛异常而静默失败)。
                     try {
                         ArrayList<Subscription> subs = Hawk.get(HawkConfig.SUBSCRIPTIONS, new ArrayList<Subscription>());
                         settings.addProperty(HawkConfig.SUBSCRIPTIONS, new Gson().toJson(subs));
+                        // 把本地订阅文件内容一同打包
+                        for (Subscription sub : subs) {
+                            if (isLocalUrl(sub.getUrl())) {
+                                byte[] data = readLocalBytes(sub.getUrl());
+                                if (data != null) {
+                                    if (localFiles == null) {
+                                        localFiles = new JsonObject();
+                                    }
+                                    localFiles.addProperty(sub.getUrl(), Base64.encodeToString(data, Base64.NO_WRAP));
+                                }
+                            }
+                        }
                     } catch (Exception ignore) {
                     }
                     continue;
@@ -115,7 +150,19 @@ public class BackupManager {
                 if (all.containsKey(key)) {
                     Object val = all.get(key);
                     if (val instanceof String) {
-                        settings.addProperty(key, (String) val);
+                        String s = (String) val;
+                        settings.addProperty(key, s);
+                        // 本地文件型设置项(API_URL/LIVE_URL 等可能是 file:// 或 content:// 配置文件):
+                        // 把文件内容一并打包, 否则跨设备后该 URL 指向发送端私有路径, 加载会报"无法读取本地配置文件"。
+                        if (isLocalUrl(s)) {
+                            byte[] data = readLocalBytes(s);
+                            if (data != null) {
+                                if (localFiles == null) {
+                                    localFiles = new JsonObject();
+                                }
+                                localFiles.addProperty(s, Base64.encodeToString(data, Base64.NO_WRAP));
+                            }
+                        }
                     } else if (val instanceof Integer) {
                         settings.addProperty(key, (Integer) val);
                     } else if (val instanceof Long) {
@@ -128,7 +175,11 @@ public class BackupManager {
                 }
             }
             root.add("settings", settings);
+            if (localFiles != null) {
+                root.add("localFiles", localFiles);
+            }
 
+            // 写文件
             FileWriter writer = new FileWriter(outFile);
             writer.write(root.toString());
             writer.close();
@@ -139,14 +190,19 @@ public class BackupManager {
         }
     }
 
+    /**
+     * 从 JSON 文件恢复
+     */
     public static boolean importBackup(File inFile) {
         try {
             FileReader reader = new FileReader(inFile);
             JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
             reader.close();
 
+            // 1. 恢复收藏
             if (root.has("collects")) {
                 JsonArray collectArr = root.getAsJsonArray("collects");
+                // 先清空
                 AppDataManager.get().getVodCollectDao().deleteAll();
                 for (int i = 0; i < collectArr.size(); i++) {
                     JsonObject obj = collectArr.get(i).getAsJsonObject();
@@ -160,6 +216,7 @@ public class BackupManager {
                 }
             }
 
+            // 2. 恢复历史
             if (root.has("records")) {
                 JsonArray recordArr = root.getAsJsonArray("records");
                 AppDataManager.get().getVodRecordDao().deleteAll();
@@ -174,13 +231,18 @@ public class BackupManager {
                 }
             }
 
+            // 3. 恢复设置
             if (root.has("settings")) {
                 JsonObject settings = root.getAsJsonObject("settings");
                 SharedPreferences sp = App.getInstance().getSharedPreferences("Hawk", Context.MODE_PRIVATE);
                 SharedPreferences.Editor editor = sp.edit();
                 Map<String, ?> all = sp.getAll();
+                // 本地文件内容池(跨设备重建用): key=原本地 url, value=Base64 文件内容
+                JsonObject lf = root.has("localFiles") ? root.getAsJsonObject("localFiles") : null;
                 for (String key : BACKUP_KEYS) {
                     if (key.equals(HawkConfig.SUBSCRIPTIONS)) {
+                        // 订阅源是 List<Subscription> 复杂对象: 必须走 Hawk.put 才能同时写回
+                        // "值"与"类型标记", 否则 Hawk 反序列化会失败/退化成 LinkedTreeMap, 订阅管理读不到
                         continue;
                     }
                     if (settings.has(key)) {
@@ -202,7 +264,11 @@ public class BackupManager {
                                         editor.putString(key, p.getAsString());
                                     }
                                 } else {
-                                    editor.putString(key, p.getAsString());
+                                    String raw = p.getAsString();
+                                    // 本地文件型设置项(API_URL/LIVE_URL): 跨设备后原 url 指向发送端私有路径,
+                                    // 用打包内容在接收端重建文件并重写成本机 url, 否则加载报"无法读取本地配置文件"。
+                                    raw = restoreLocalFile(raw, lf, "localsources");
+                                    editor.putString(key, raw);
                                 }
                             }
                         } catch (Exception e) {
@@ -210,6 +276,8 @@ public class BackupManager {
                         }
                     }
                 }
+                // 单独恢复订阅源列表(值 + 类型标记一起写)。
+                // 兼容两种形态: 旧备份/其它实现可能把订阅存为 JSON 数组, 这里都能解析。
                 if (settings.has(HawkConfig.SUBSCRIPTIONS)) {
                     try {
                         com.google.gson.JsonElement subEl = settings.get(HawkConfig.SUBSCRIPTIONS);
@@ -222,6 +290,11 @@ public class BackupManager {
                             subs = new Gson().fromJson(subEl.getAsString(), type);
                         }
                         if (subs != null) {
+                            // 本地订阅文件: 用打包进备份的内容在私有目录重建文件, 并重写 URL,
+                            // 否则同步/换机后订阅指向发送端私有路径(文件不存在)→ 加载报"无法读取本地配置文件"。
+                            for (Subscription sub : subs) {
+                                sub.setUrl(restoreLocalFile(sub.getUrl(), lf, "subscriptions"));
+                            }
                             Hawk.put(HawkConfig.SUBSCRIPTIONS, subs);
                         }
                     } catch (Exception e) {
@@ -235,6 +308,93 @@ public class BackupManager {
         } catch (Exception e) {
             e.printStackTrace();
             return false;
+        }
+    }
+
+    // ============================ 本地订阅文件辅助 ============================
+
+    private static boolean isLocalUrl(String url) {
+        return url != null && (url.startsWith("file://") || url.startsWith("content://"));
+    }
+
+    /** 读取本地(私有文件 / content)订阅的内容字节; 读不到返回 null。 */
+    private static byte[] readLocalBytes(String url) {
+        if (url == null) {
+            return null;
+        }
+        InputStream in = null;
+        try {
+            if (url.startsWith("file://")) {
+                in = new FileInputStream(Uri.parse(url).getPath());
+            } else {
+                in = App.getInstance().getContentResolver().openInputStream(Uri.parse(url));
+            }
+            if (in == null) {
+                return null;
+            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            in.close();
+            return out.toByteArray();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (Exception ignore) {
+                }
+            }
+        }
+    }
+
+    /** 由订阅原 url 派生稳定的私有文件名(跨设备一致, 且不重名)。 */
+    private static String localFileName(String url) {
+        return md5(url) + ".json";
+    }
+
+    /**
+     * 若原 url 是本地(file:// / content://)配置文件且备份里带有其内容, 则在接收端私有目录重建文件,
+     * 返回重写后的本机 url; 否则原样返回。用于跨设备同步/还原影视源 / 直播源 / 订阅等本地文件型配置。
+     * 单条失败 try/catch 跳过, 不影响其余配置。
+     */
+    private static String restoreLocalFile(String origUrl, JsonObject localFiles, String subDir) {
+        if (origUrl == null || localFiles == null || !isLocalUrl(origUrl) || !localFiles.has(origUrl)) {
+            return origUrl;
+        }
+        try {
+            byte[] data = Base64.decode(localFiles.get(origUrl).getAsString(), Base64.NO_WRAP);
+            File dir = new File(App.getInstance().getFilesDir(), subDir);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+            File target = new File(dir, localFileName(origUrl));
+            FileOutputStream fos = new FileOutputStream(target);
+            fos.write(data);
+            fos.close();
+            return Uri.fromFile(target).toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return origUrl;
+        }
+    }
+
+    private static String md5(String s) {
+        try {
+            MessageDigest d = MessageDigest.getInstance("MD5");
+            byte[] b = d.digest(s.getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            for (byte x : b) {
+                sb.append(String.format("%02x", x));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return String.valueOf(Math.abs(s.hashCode()));
         }
     }
 }
