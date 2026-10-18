@@ -4,16 +4,21 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 import com.github.tvbox.osc.base.App;
+import com.github.tvbox.osc.bean.Subscription;
 import com.github.tvbox.osc.cache.VodCollect;
 import com.github.tvbox.osc.cache.VodRecord;
 import com.github.tvbox.osc.data.AppDataManager;
+import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.reflect.TypeToken;
+import com.orhanobut.hawk.Hawk;
 
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -99,6 +104,14 @@ public class BackupManager {
             SharedPreferences sp = App.getInstance().getSharedPreferences("Hawk", Context.MODE_PRIVATE);
             Map<String, ?> all = sp.getAll();
             for (String key : BACKUP_KEYS) {
+                if (key.equals(HawkConfig.SUBSCRIPTIONS)) {
+                    try {
+                        ArrayList<Subscription> subs = Hawk.get(HawkConfig.SUBSCRIPTIONS, new ArrayList<Subscription>());
+                        settings.addProperty(HawkConfig.SUBSCRIPTIONS, new Gson().toJson(subs));
+                    } catch (Exception ignore) {
+                    }
+                    continue;
+                }
                 if (all.containsKey(key)) {
                     Object val = all.get(key);
                     if (val instanceof String) {
@@ -167,6 +180,9 @@ public class BackupManager {
                 SharedPreferences.Editor editor = sp.edit();
                 Map<String, ?> all = sp.getAll();
                 for (String key : BACKUP_KEYS) {
+                    if (key.equals(HawkConfig.SUBSCRIPTIONS)) {
+                        continue;
+                    }
                     if (settings.has(key)) {
                         try {
                             com.google.gson.JsonElement el = settings.get(key);
@@ -192,6 +208,24 @@ public class BackupManager {
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
+                    }
+                }
+                if (settings.has(HawkConfig.SUBSCRIPTIONS)) {
+                    try {
+                        com.google.gson.JsonElement subEl = settings.get(HawkConfig.SUBSCRIPTIONS);
+                        java.lang.reflect.Type type = new TypeToken<ArrayList<Subscription>>() {
+                        }.getType();
+                        ArrayList<Subscription> subs = null;
+                        if (subEl.isJsonArray()) {
+                            subs = new Gson().fromJson(subEl, type);
+                        } else if (subEl.isJsonPrimitive()) {
+                            subs = new Gson().fromJson(subEl.getAsString(), type);
+                        }
+                        if (subs != null) {
+                            Hawk.put(HawkConfig.SUBSCRIPTIONS, subs);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
                 }
                 editor.apply();
