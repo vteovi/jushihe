@@ -30,6 +30,9 @@ public class LiveChannelGroup {
     }
 
     public ArrayList<LiveChannelItem> getLiveChannels() {
+        if (liveChannelItems == null) {
+            liveChannelItems = new ArrayList<>();
+        }
         return liveChannelItems;
     }
 

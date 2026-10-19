@@ -14,7 +14,7 @@ import java.io.OutputStream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import dalvik.system.DexClassLoader;
+import dalvik.system.BaseDexClassLoader;
 import okhttp3.Response;
 
 public class JsLoader {
@@ -43,7 +43,9 @@ public class JsLoader {
             File cacheDir = new File(App.getInstance().getCacheDir().getAbsolutePath() + "/catvod_jsapi");
             if (!cacheDir.exists())
                 cacheDir.mkdirs();
-            DexClassLoader classLoader = new DexClassLoader(jar, cacheDir.getAbsolutePath(), null, App.getInstance().getClassLoader());
+            // 与 JarLoader 共用同一套加载策略: Android 14+ 只允许从内存加载 dex,
+            // 14 以下沿用 DexClassLoader(它才能读到 jar 内的资源)
+            BaseDexClassLoader classLoader = JarLoader.createClassLoader(jar, cacheDir);
             // make force wait here, some device async dex load
             int count = 0;
             do {

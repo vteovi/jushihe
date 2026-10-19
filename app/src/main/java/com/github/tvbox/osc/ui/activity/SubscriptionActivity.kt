@@ -3,7 +3,6 @@ package com.github.tvbox.osc.ui.activity
 import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
-import android.os.Environment
 import android.provider.OpenableColumns
 import android.text.TextUtils
 import android.view.View
@@ -22,6 +21,7 @@ import com.github.tvbox.osc.ui.dialog.SubsTipDialog
 import com.github.tvbox.osc.ui.dialog.SubsciptionDialog
 import com.github.tvbox.osc.ui.dialog.SubsciptionDialog.OnSubsciptionListener
 import com.github.tvbox.osc.util.HawkConfig
+import com.github.tvbox.osc.util.LocalImport
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.lxj.xpopup.XPopup
@@ -29,7 +29,6 @@ import com.lzy.okgo.OkGo
 import com.lzy.okgo.callback.AbsCallback
 import com.lzy.okgo.model.Response
 import com.orhanobut.hawk.Hawk
-import java.io.File
 import java.util.function.Consumer
 
 class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
@@ -198,29 +197,26 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
 
     /**
      * 处理系统文件管理器选中的文件：
-     * 读取内容并复制到 App 自己的外部目录（Android/data/<pkg>/files/subscriptions/），
-     * 再以 clan:// 协议引用 —— App 读写自有目录无需任何存储权限，
-     * 内置 HTTP 服务读取必然成功（避免公共目录权限/路径解析导致的 404/5xx）。
+     * 复制到 App 内部私有目录 files/subscriptions/ 并以 file:// 绝对路径引用。
+     * 不用 clan:// 外部目录：那份文件属于本机私有路径，跨设备同步后接收端并不存在，
+     * 内置 HTTP 服务必然返回 404（表现为"暂无可用数据源"）。file:// 由 BackupManager
+     * 识别并把文件内容一起打包，接收端重建后即可正常使用。
      */
     private fun handlePickedFile(uri: Uri) {
         try {
             val name = getDisplayName(uri)
-            val content = readUriText(uri)
-            if (content.isNullOrBlank()) {
-                ToastUtils.showShort("读取文件失败或内容为空")
-                return
-            }
-            val clanPath = copyToAppExternalDir(name, content) ?: run {
-                ToastUtils.showShort("保存订阅文件失败")
+            val privateUrl = LocalImport.copyToPrivate(this, uri, "subscriptions", name)
+            if (privateUrl == null) {
+                ToastUtils.showShort("本地文件复制失败")
                 return
             }
             for (item in mSubscriptions) {
-                if (item.url == clanPath) {
+                if (item.url == privateUrl) {
                     ToastUtils.showLong("订阅地址与" + item.name + "相同")
                     return
                 }
             }
-            addSubscription(name, clanPath, mCheckedWhenPick)
+            addSubscription(name, privateUrl, mCheckedWhenPick)
         } catch (e: Exception) {
             LogUtils.e(e)
             ToastUtils.showShort("导入失败:" + e.message)
@@ -244,18 +240,6 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
         }
     }
 
-    /** 读取 Uri 指向文件的全部文本内容 */
-    private fun readUriText(uri: Uri): String? {
-        return try {
-            contentResolver.openInputStream(uri)?.use { input ->
-                input.bufferedReader().use { it.readText() }
-            }
-        } catch (e: Exception) {
-            LogUtils.e(e)
-            null
-        }
-    }
-
     /** 获取文件显示名（无真实路径时使用） */
     private fun getDisplayName(uri: Uri): String {
         var name = queryColumn(uri, OpenableColumns.DISPLAY_NAME)
@@ -269,38 +253,8 @@ class SubscriptionActivity : BaseVbActivity<ActivitySubscriptionBinding>() {
         return if (safe.endsWith(".json", true) || safe.endsWith(".txt", true)) safe else "$safe.json"
     }
 
-    /** 把内容复制到 App 外部私有目录 files/subscriptions 下，返回 clan:// 路径；失败返回 null */
-    private fun copyToAppExternalDir(name: String, content: String): String? {
-        return try {
-            val base = File(
-                Environment.getExternalStorageDirectory(),
-                "Android/data/$packageName/files/subscriptions"
-            )
-            if (!base.exists()) {
-                base.mkdirs()
-            }
-            var target = File(base, name)
-            var index = 1
-            while (target.exists()) {
-                val dot = name.lastIndexOf('.')
-                val prefix = if (dot > 0) name.substring(0, dot) else name
-                val suffix = if (dot > 0) name.substring(dot) else ""
-                target = File(base, "$prefix($index)$suffix")
-                index++
-            }
-            target.writeText(content)
-            target.absolutePath.replace(
-                Environment.getExternalStorageDirectory().getAbsolutePath(),
-                "clan://localhost"
-            )
-        } catch (e: Exception) {
-            LogUtils.e(e)
-            null
-        }
-    }
-
     private fun addSubscription(name: String, url: String, checked: Boolean) {
-        if (url.startsWith("clan://")) {
+        if (url.startsWith("clan://") || url.startsWith("content://") || url.startsWith("file://")) {
             addSub2List(name, url, checked)
             mSubscriptionAdapter.setNewData(mSubscriptions)
         } else if (url.startsWith("http")) {

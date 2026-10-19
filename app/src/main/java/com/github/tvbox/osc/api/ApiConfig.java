@@ -37,6 +37,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -149,6 +150,39 @@ public class ApiConfig {
         if (useCache && cacheHit) {
             return;
         }
+        // 内置配置
+        if (apiUrl.startsWith("assets://")) {
+            try {
+                parseJson(apiUrl, readAssetConfig(apiUrl.substring("assets://".length())));
+                if (!cacheHit) {
+                    callback.success();
+                }
+            } catch (Throwable th) {
+                th.printStackTrace();
+                if (!cacheHit) {
+                    callback.error("加载内置配置失败");
+                }
+            }
+            return;
+        }
+        // 本地导入的配置文件(私有目录 file:// 或 SAF content://): 直接读文件, 不走网络/内置 HTTP 服务。
+        // 跨设备同步后这类地址是接收端自己重建出来的文件, 只有直接读文件才能稳定加载。
+        if (apiUrl.startsWith("content://") || apiUrl.startsWith("file://")) {
+            try {
+                String json = readContentConfig(Uri.parse(apiUrl));
+                parseJson(apiUrl, json);
+                writeConfigCache(cache, json);
+                if (!cacheHit) {
+                    callback.success();
+                }
+            } catch (Throwable th) {
+                th.printStackTrace();
+                if (!cacheHit) {
+                    callback.error("无法读取本地配置文件");
+                }
+            }
+            return;
+        }
         String TempKey = null, configUrl = "", pk = ";pk;";
         if (apiUrl.contains(pk)) {
             String[] a = apiUrl.split(pk);
@@ -178,15 +212,7 @@ public class ApiConfig {
                             String json = response.body();
                             parseJson(apiUrl, json);
                             try {
-                                File cacheDir = cache.getParentFile();
-                                if (!cacheDir.exists())
-                                    cacheDir.mkdirs();
-                                if (cache.exists())
-                                    cache.delete();
-                                FileOutputStream fos = new FileOutputStream(cache);
-                                fos.write(json.getBytes("UTF-8"));
-                                fos.flush();
-                                fos.close();
+                                writeConfigCache(cache, json);
                             } catch (Throwable th) {
                                 th.printStackTrace();
                             }
@@ -303,6 +329,52 @@ public class ApiConfig {
                 callback.error("");
             }
         });
+    }
+
+    /** 读取 assets 下的内置配置 */
+    private String readAssetConfig(String assetPath) throws Throwable {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(
+                App.getInstance().getAssets().open(assetPath), "UTF-8"));
+        StringBuilder content = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            content.append(line).append('\n');
+        }
+        reader.close();
+        return content.toString();
+    }
+
+    /** 读取本地配置: file:// 走绝对路径, content:// 走 ContentResolver */
+    private String readContentConfig(Uri uri) throws Throwable {
+        InputStream input;
+        if ("file".equals(uri.getScheme())) {
+            input = new FileInputStream(uri.getPath());
+        } else {
+            input = App.getInstance().getContentResolver().openInputStream(uri);
+        }
+        if (input == null) {
+            throw new IllegalStateException("Unable to open local config");
+        }
+        BufferedReader reader = new BufferedReader(new InputStreamReader(input, "UTF-8"));
+        StringBuilder content = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            content.append(line).append('\n');
+        }
+        reader.close();
+        return content.toString();
+    }
+
+    private void writeConfigCache(File cache, String json) throws Throwable {
+        File cacheDir = cache.getParentFile();
+        if (!cacheDir.exists())
+            cacheDir.mkdirs();
+        if (cache.exists())
+            cache.delete();
+        FileOutputStream fos = new FileOutputStream(cache);
+        fos.write(json.getBytes("UTF-8"));
+        fos.flush();
+        fos.close();
     }
 
     private void parseJson(String apiUrl, File f) throws Throwable {
@@ -493,15 +565,6 @@ public class ApiConfig {
                     }
                 }
 
-                // takagen99: Load Live Channel from settings URL (WIP)
-                if (StringUtils.isBlank(liveURL_final)) {
-                    liveURL_final = liveURL;
-                }
-                liveURL_final = Base64.encodeToString(liveURL_final.getBytes("UTF-8"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP);
-                liveURL_final = "http://127.0.0.1:9978/proxy?do=live&type=txt&ext=" + liveURL_final;
-                LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
-                liveChannelGroup.setGroupName(liveURL_final);
-                liveChannelGroupList.add(liveChannelGroup);
             }
 
 
