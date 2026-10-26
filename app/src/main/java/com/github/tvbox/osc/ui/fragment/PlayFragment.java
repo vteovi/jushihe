@@ -1674,7 +1674,8 @@ public class PlayFragment extends BaseLazyFragment {
         VodInfo.VodSeries vs = mVodInfo.seriesMap.get(mVodInfo.playFlag).get(mVodInfo.playIndex);
         String playTitle = mVodInfo.name + " " + vs.name;
         long progress = getSavedProgress(progressKey);
-        boolean ok = PlayerHelper.runExternalPlayer(playerType, requireActivity(), url, playTitle, playSubtitle, new java.util.HashMap<>(webHeaderMap), progress);
+        java.util.HashMap<String, String> extHeaders = (webHeaderMap == null) ? new java.util.HashMap<>() : new java.util.HashMap<>(webHeaderMap);
+        boolean ok = PlayerHelper.runExternalPlayer(playerType, requireActivity(), url, playTitle, playSubtitle, extHeaders, progress);
         ToastUtils.showShort(ok ? "已调用 " + PlayerHelper.getPlayerName(playerType) : "调用失败, 请确认已安装 " + PlayerHelper.getPlayerName(playerType));
     }
 
