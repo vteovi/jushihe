@@ -45,6 +45,11 @@ import xyz.doikki.videoplayer.player.VideoView;
 
 public class LocalPlayActivity extends BaseVbActivity<ActivityLocalPlayBinding> {
 
+    /** 本地视频播放固定横屏（清单已声明 landscape），不能被手机的竖屏锁定覆盖 */
+    @Override
+    protected boolean lockPortraitOnPhone() {
+        return false;
+    }
 
     private MyVideoView mVideoView;
     LocalVideoController mController;

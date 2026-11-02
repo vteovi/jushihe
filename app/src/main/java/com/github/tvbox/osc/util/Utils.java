@@ -26,12 +26,36 @@ public class Utils {
     }
 
     /**
-     * 首页海报网格列数（本项目仅适配手机竖屏，不做平板/横屏适配）。
-     * 横屏海报开关打开：一行一张 16:9 横版卡片 → 1 列。
-     * 关闭：竖版 2:3 海报 → 2 列。
+     * 是否为大屏设备（平板）。以最小宽度 600dp 为分界（Google 平板/大屏判定标准）。
+     * 手机（含大屏手机）为 false，横向摆放的平板/折叠屏展开态为 true。
+     */
+    public static boolean isTablet(Context context) {
+        return context != null
+                && context.getResources().getConfiguration().smallestScreenWidthDp >= 600;
+    }
+
+    /**
+     * 首页海报网格列数：按当前可用宽度动态计算，手机竖屏保持原样，平板/横屏自动多列。
+     * 横版 16:9 卡片（横屏海报开关打开）目标列宽 400dp；
+     * 竖版 2:3 海报目标列宽 180dp。
+     * 手机竖屏 360dp 时分别为 1 列 / 2 列，与旧版固定值完全一致，不影响现有观感。
      */
     public static int getPosterSpanCount(Context context) {
-        return Hawk.get(HawkConfig.LANDSCAPE_CARD, false) ? 1 : 2;
+        int widthDp = 360;
+        if (context != null) {
+            int w = context.getResources().getConfiguration().screenWidthDp;
+            if (w > 0) {
+                widthDp = w;
+            }
+        }
+        if (Hawk.get(HawkConfig.LANDSCAPE_CARD, false)) {
+            // 横版卡片：一行一张~三张，最多 4 列
+            int span = Math.round(widthDp / 400f);
+            return Math.max(1, Math.min(4, span));
+        }
+        // 竖版海报：至少 2 列，平板横屏最多 6 列
+        int span = Math.round(widthDp / 180f);
+        return Math.max(2, Math.min(6, span));
     }
 
     public static int getSeriesSpanCount(List<VodInfo.VodSeries> list) {

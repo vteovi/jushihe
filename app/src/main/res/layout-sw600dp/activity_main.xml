@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 平板/大屏布局：左侧竖直导航栏（NavigationRail）+ 右侧内容区，替代竖屏的底部导航。
+     id 用 nav_rail 而非 bottom_nav，避免 ViewBinding 在 layout / layout-sw600dp
+     两个变体之间对同一 id 推断出不同类型而编译失败 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    tools:context=".ui.activity.MainActivity">
+
+    <!-- 外层容器铺白底：rail 自身用 marginTop 下移，避免第一个图标贴住状态栏；
+         若直接把背景色放在 rail 上，下移后会露出父容器底色形成色块 -->
+    <FrameLayout
+        android:layout_width="88dp"
+        android:layout_height="match_parent"
+        android:background="@color/white">
+
+        <com.google.android.material.navigationrail.NavigationRailView
+            android:id="@+id/nav_rail"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="28dp"
+            app:itemIconSize="26dp"
+            app:itemIconTint="@drawable/bottom_navigation_item_selector"
+            app:itemTextColor="@drawable/bottom_navigation_item_selector"
+            app:labelVisibilityMode="labeled"
+            app:menu="@menu/main_bottom_navigation" />
+
+    </FrameLayout>
+
+    <androidx.viewpager.widget.ViewPager
+        android:id="@+id/vp"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1" />
+</LinearLayout>

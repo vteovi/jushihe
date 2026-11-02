@@ -90,6 +90,13 @@ import xyz.doikki.videoplayer.player.VideoView;
  */
 public class LiveActivity extends BaseActivity {
     public static Context context;
+
+    /** 直播需要横屏全屏，手机上也不锁竖屏（平板由 BaseActivity 放开为跟随传感器） */
+    @Override
+    protected boolean lockPortraitOnPhone() {
+        return false;
+    }
+
     private VideoView mVideoView;
     private TextView tvChannelInfo;
     private LinearLayout tvLeftChannelListLayout;

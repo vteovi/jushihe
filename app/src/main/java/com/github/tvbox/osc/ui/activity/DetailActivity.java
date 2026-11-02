@@ -109,6 +109,13 @@ import java.util.concurrent.Executors;
  */
 
 public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
+
+    /** 详情页含播放器，需要横屏全屏，手机上也不锁竖屏 */
+    @Override
+    protected boolean lockPortraitOnPhone() {
+        return false;
+    }
+
     private PlayFragment playFragment = null;
     private SourceViewModel sourceViewModel;
     private Movie.Video mVideo;

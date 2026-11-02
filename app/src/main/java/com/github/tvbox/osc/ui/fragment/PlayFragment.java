@@ -77,6 +77,7 @@ import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.LOG;
 import com.github.tvbox.osc.util.MD5;
 import com.github.tvbox.osc.util.PlayerHelper;
+import com.github.tvbox.osc.util.Utils;
 import com.github.tvbox.osc.util.VideoParseRuler;
 import com.github.tvbox.osc.util.thunder.Jianpian;
 import com.github.tvbox.osc.util.thunder.Thunder;
@@ -398,8 +399,12 @@ public class PlayFragment extends BaseLazyFragment {
                     .navigationBarColor(R.color.black)//即使隐藏部分时候还是会显示
                     .fitsSystemWindows(false)
                     .init();
-        }else {//非全屏统一设置竖屏,activity处理为小的预览尺寸
-            mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        }else {//非全屏：手机统一竖屏（小预览尺寸）；平板保持自由旋转，不要硬翻成竖屏
+            if (Utils.isTablet(mActivity)) {
+                mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+            } else {
+                mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            }
 
             ImmersionBar.with(mActivity)
                     .hideBar(BarHide.FLAG_SHOW_BAR)

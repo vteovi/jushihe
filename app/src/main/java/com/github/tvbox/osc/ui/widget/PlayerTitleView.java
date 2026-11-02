@@ -23,6 +23,7 @@ import androidx.annotation.Nullable;
 
 import com.blankj.utilcode.util.ActivityUtils;
 import com.github.tvbox.osc.ui.activity.LiveActivity;
+import com.github.tvbox.osc.util.Utils;
 
 import xyz.doikki.videocontroller.R;
 import xyz.doikki.videoplayer.controller.ControlWrapper;
@@ -67,7 +68,12 @@ public class PlayerTitleView extends FrameLayout implements IControlComponent {
                 Activity activity = PlayerUtils.scanForActivity(getContext());
                 if (activity != null) {
                     if (mControlWrapper.isFullScreen()){
-                        activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                        // 平板退出全屏时保持自由旋转，避免被硬翻回竖屏
+                        if (Utils.isTablet(activity)) {
+                            activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+                        } else {
+                            activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+                        }
                         mControlWrapper.stopFullScreen();
                     }else {
                         activity.finish();

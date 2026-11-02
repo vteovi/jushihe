@@ -18,5 +18,12 @@
   原样搬运（备份还原）则直接复制串即可，复杂对象（List/Set）也能无损还原。
 - 导入后若会立即重启 App，落盘用 `commit()` 而不是 `apply()`。
 
+## 屏幕适配（v1.10.0 起支持大屏平板横屏）
+- 判定统一用 `Utils.isTablet(context)`（`smallestScreenWidthDp >= 600`），与 `layout-sw600dp/` 限定符一致，不要另造标准。
+- 方向不写在清单里：`BaseActivity.applyScreenOrientation()` 统一控制（手机锁竖屏、平板 `FULL_SENSOR`）；播放类页面覆盖 `lockPortraitOnPhone()` 返回 false。
+- autosize 设计稿是 360dp 竖屏稿，`BaseActivity.getSizeInDp()` 在 sw600dp 时返回 `screenWidthDp`（1:1），否则平板横屏会被放大数倍。清单已声明 `configChanges`，所以必须在 `onConfigurationChanged` 里手动 `AutoSize.autoConvertDensity`。
+- 新增平板布局放 `layout-sw600dp/`。**同一 id 在不同 layout 变体里必须是同一控件类型**，否则 ViewBinding 报冲突；需要不同控件（如底部导航 vs 侧边导航）就用不同 id + 代码 `findViewById` 取共同基类。
+- 网格列数由 `Utils.getPosterSpanCount()` 按屏宽动态计算（竖版 180dp/列、横版 400dp/列），不要再写死 2 列。
+
 ## 已知坑
 - `HawkConfig` 只有字符串常量；`BackupManager.BACKUP_KEYS` 里出现未定义常量会直接编译失败。

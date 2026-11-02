@@ -2,30 +2,49 @@ package com.github.tvbox.osc.ui.activity
 
 import android.os.Process
 import android.view.MenuItem
+import android.view.View
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentPagerAdapter
+import androidx.viewpager.widget.ViewPager
 import androidx.viewpager.widget.ViewPager.SimpleOnPageChangeListener
 import com.blankj.utilcode.util.ActivityUtils
 import com.blankj.utilcode.util.ToastUtils
+import com.github.tvbox.osc.R
 import com.github.tvbox.osc.base.BaseVbActivity
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.databinding.ActivityMainBinding
 import com.github.tvbox.osc.ui.fragment.GridFragment
 import com.github.tvbox.osc.ui.fragment.HomeFragment
 import com.github.tvbox.osc.ui.fragment.MyFragment
+import com.google.android.material.navigation.NavigationBarView
 import kotlin.system.exitProcess
 
 class MainActivity : BaseVbActivity<ActivityMainBinding>() {
 
-    var fragments = listOf(HomeFragment(),MyFragment())
+    var fragments = listOf(HomeFragment(), MyFragment())
     var useCacheConfig = false
     private var exitTime = 0L
 
+    /**
+     * 导航栏与内容区统一用 NavigationBarView / ViewPager 获取：
+     * 竖屏是底部 BottomNavigationView，平板（layout-sw600dp）是左侧 NavigationRailView，
+     * 两者都继承 NavigationBarView，用基类接住即可，避免 ViewBinding 跨布局变体的类型差异。
+     */
+    private lateinit var mNavigationBar: NavigationBarView
+    private lateinit var mViewPager: ViewPager
+
     override fun init() {
 
-        useCacheConfig = intent.extras?.getBoolean(IntentKey.CACHE_CONFIG_CHANGED, false)?:false
+        useCacheConfig = intent.extras?.getBoolean(IntentKey.CACHE_CONFIG_CHANGED, false) ?: false
 
-        mBinding.vp.adapter = object : FragmentPagerAdapter(supportFragmentManager) {
+        mViewPager = findViewById(R.id.vp)
+        // 竖屏是底部 BottomNavigationView(bottom_nav)，平板是左侧 NavigationRailView(nav_rail)，
+        // 两者都继承 NavigationBarView，用基类接住即可
+        val bottomNav = findViewById<View?>(R.id.bottom_nav) as? NavigationBarView
+        val navRail = findViewById<View?>(R.id.nav_rail) as? NavigationBarView
+        mNavigationBar = bottomNav ?: navRail!!
+
+        mViewPager.adapter = object : FragmentPagerAdapter(supportFragmentManager) {
             override fun getItem(position: Int): Fragment {
                 return fragments[position]
             }
@@ -35,20 +54,20 @@ class MainActivity : BaseVbActivity<ActivityMainBinding>() {
             }
         }
 
-        mBinding.bottomNav.setOnNavigationItemSelectedListener { menuItem: MenuItem ->
-            mBinding.vp.setCurrentItem(menuItem.order, false)
+        mNavigationBar.setOnItemSelectedListener { menuItem: MenuItem ->
+            mViewPager.setCurrentItem(menuItem.order, false)
             true
         }
-        mBinding.vp.addOnPageChangeListener(object : SimpleOnPageChangeListener() {
+        mViewPager.addOnPageChangeListener(object : SimpleOnPageChangeListener() {
             override fun onPageSelected(position: Int) {
-                mBinding.bottomNav.menu.getItem(position).setChecked(true)
+                mNavigationBar.menu.getItem(position).isChecked = true
             }
         })
     }
 
     override fun onBackPressed() {
-        if (mBinding.vp.currentItem == 1) {
-            mBinding.vp.currentItem = 0
+        if (mViewPager.currentItem == 1) {
+            mViewPager.currentItem = 0
             return
         }
         val homeFragment = fragments[0] as HomeFragment

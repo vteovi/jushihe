@@ -2,7 +2,9 @@ package com.github.tvbox.osc.base;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.res.AssetManager;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -42,6 +44,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
+import me.jessyan.autosize.AutoSize;
 import me.jessyan.autosize.internal.CustomAdapt;
 
 public abstract class BaseActivity extends AppCompatActivity implements CustomAdapt, OnTitleBarListener {
@@ -54,6 +57,8 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
+        // 方向必须赶在 super.onCreate 之前定好，否则平板上会先按清单方向起一帧再翻转
+        applyScreenOrientation();
         super.onCreate(savedInstanceState);
         EventBus.getDefault().register(this);
 
@@ -204,12 +209,52 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
 
     @Override
     public float getSizeInDp() {
+        Configuration configuration = getResources().getConfiguration();
+        if (configuration.smallestScreenWidthDp >= 600) {
+            // 平板/大屏：按原生 dp 渲染（设计稿宽度 = 当前屏宽，缩放比 1:1）。
+            // 否则 360dp 的竖屏设计稿在横屏 1280dp 上会被放大 3.5 倍，界面巨大且一屏放不下几行。
+            return configuration.screenWidthDp;
+        }
         return isBaseOnWidth() ? 360 : 720;
     }
 
     @Override
     public boolean isBaseOnWidth() {
         return true;
+    }
+
+    /**
+     * 屏幕方向策略：
+     * 手机（sw < 600dp）锁竖屏，保持原有单手握持体验；
+     * 平板（sw >= 600dp）放开为跟随传感器，横屏即大屏主形态。
+     * 播放类页面（直播/详情/本地播放）可覆盖 {@link #lockPortraitOnPhone()} 返回 false 保持自由旋转。
+     */
+    protected void applyScreenOrientation() {
+        try {
+            if (Utils.isTablet(this)) {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR);
+            } else if (lockPortraitOnPhone()) {
+                setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+            }
+        } catch (Throwable e) {
+            // 个别定制 ROM 会抛异常；方向设置失败不应影响页面启动
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 手机上是否锁定竖屏。默认 true；播放类页面覆盖为 false 以保留横屏全屏能力。
+     */
+    protected boolean lockPortraitOnPhone() {
+        return true;
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // 清单里声明了 configChanges(orientation|screenSize)，横竖屏切换不会重建 Activity，
+        // 必须手动按新尺寸重算 autosize 缩放，否则平板横竖切换后所有 dp 尺寸会错乱
+        AutoSize.autoConvertDensity(this, getSizeInDp(), isBaseOnWidth());
     }
 
     @Override
