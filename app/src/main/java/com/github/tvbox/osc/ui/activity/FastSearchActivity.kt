@@ -9,8 +9,11 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -82,7 +85,11 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
     private var resultVods = HashMap<String, MutableList<Movie.Video>>()
     private var pauseRunnable: MutableList<Runnable>? = null
     private var mSearchSuggestionsDialog: SearchSuggestionsDialog? = null
+    /** 平板根布局的原始顶部留白（px），用于按状态栏真实高度重算时做兜底 */
+    private var rootBaseTopPadding = -1
+
     override fun init() {
+        applyTabletStatusBarPadding()
         // 进入搜索页自动弹出软键盘
         mBinding.etSearch.requestFocus()
         mBinding.etSearch.postDelayed({
@@ -258,9 +265,34 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
     // 本页声明了 configChanges，旋转不会重建，列数要按新屏宽自己重算
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        applyTabletStatusBarPadding()
         val spanCount = Utils.getPosterSpanCount(this)
         updateGridSpan(mBinding.mGridView, spanCount)
         updateGridSpan(mBinding.mGridViewFilter, spanCount)
+    }
+
+    /**
+     * 平板/大屏：搜索页没有 TitleBar，是靠根布局 paddingTop 手写避让状态栏的。
+     * sw600dp 布局里写死的 32dp 只作兜底，这里再按真实的状态栏 inset 补一次，
+     * 避免状态栏较高（或横屏不隐藏状态栏）时搜索栏被压住。
+     * 手机布局（paddingTop 40dp）不走这段逻辑，保持原样。
+     */
+    private fun applyTabletStatusBarPadding() {
+        if (!Utils.isTablet(this)) return
+        val content = findViewById<ViewGroup>(android.R.id.content) ?: return
+        if (content.childCount == 0) return
+        val root = content.getChildAt(0)
+        if (rootBaseTopPadding < 0) rootBaseTopPadding = root.paddingTop
+        val density = resources.displayMetrics.density
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val statusTop = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            val target = maxOf(rootBaseTopPadding, statusTop + (8 * density).toInt())
+            if (target != view.paddingTop) {
+                view.setPadding(view.paddingLeft, target, view.paddingRight, view.paddingBottom)
+            }
+            insets
+        }
+        ViewCompat.requestApplyInsets(root)
     }
 
     private fun updateGridSpan(recyclerView: RecyclerView, spanCount: Int) {
