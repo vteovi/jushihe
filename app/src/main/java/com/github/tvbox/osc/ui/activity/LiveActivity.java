@@ -5,6 +5,7 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.IntEvaluator;
 import android.animation.ObjectAnimator;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.CountDownTimer;
 import android.os.Handler;
@@ -18,6 +19,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -207,6 +209,154 @@ public class LiveActivity extends BaseActivity {
         initSettingItemView();
         initLiveChannelList();
         initLiveSettingGroupList();
+        applyLiveLayoutForScreen();
+    }
+
+    /**
+     * 直播页布局随方向切换（全屏播放时不处理）：
+     * 竖屏 —— 上方视频（按短边 16:9 自适应）+ EPG 条，下方频道列表；
+     * 横屏/宽屏 —— 左右分栏：左 3/5 直播画面（含 EPG 条），右 2/5 频道分组/列表。
+     * 注意：清单给本页声明了 configChanges，旋转屏幕不会重建 Activity，也就不会自动
+     * 换成 layout-land，只能在这里手动改结构对应的 LayoutParams。
+     */
+    private void applyLiveLayoutForScreen() {
+        if (mVideoView != null && mVideoView.isFullScreen()) {
+            return;
+        }
+        applyLiveResponsiveLayout();
+        applyLiveVideoBoxSize();
+    }
+
+    private void applyLiveResponsiveLayout() {
+        View row = findViewById(R.id.live_content_row);
+        View column = findViewById(R.id.live_video_column);
+        View videoBox = findViewById(R.id.live_video_box);
+        View epg = findViewById(R.id.ll_epg);
+        View channelList = findViewById(R.id.tvLeftChannnelListLayout);
+        if (row == null || column == null || videoBox == null
+                || epg == null || channelList == null) {
+            return;
+        }
+        if (!(column.getLayoutParams() instanceof LinearLayout.LayoutParams)
+                || !(videoBox.getLayoutParams() instanceof LinearLayout.LayoutParams)
+                || !(epg.getLayoutParams() instanceof LinearLayout.LayoutParams)
+                || !(channelList.getLayoutParams() instanceof LinearLayout.LayoutParams)) {
+            return; // 结构不是预期的布局，放弃调整，保持默认
+        }
+        boolean land = getResources().getConfiguration().orientation
+                == Configuration.ORIENTATION_LANDSCAPE;
+        if (row instanceof LinearLayout) {
+            int orientation = land ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL;
+            if (((LinearLayout) row).getOrientation() != orientation) {
+                ((LinearLayout) row).setOrientation(orientation);
+            }
+        }
+        LinearLayout.LayoutParams colLp = (LinearLayout.LayoutParams) column.getLayoutParams();
+        LinearLayout.LayoutParams boxLp = (LinearLayout.LayoutParams) videoBox.getLayoutParams();
+        LinearLayout.LayoutParams epgLp = (LinearLayout.LayoutParams) epg.getLayoutParams();
+        LinearLayout.LayoutParams listLp = (LinearLayout.LayoutParams) channelList.getLayoutParams();
+        if (land) {
+            // 左：视频列占 3/5，视频区由权重撑满（底部留 EPG 条）
+            colLp.width = 0;
+            colLp.height = LinearLayout.LayoutParams.MATCH_PARENT;
+            colLp.weight = 3f;
+            colLp.setMargins(0, 0, 0, 0);
+            boxLp.width = LinearLayout.LayoutParams.MATCH_PARENT;
+            boxLp.height = 0;
+            boxLp.weight = 1f;
+            // EPG 条压到 64dp：左侧名称、右侧图标行、源切换行还能排在一行里
+            epgLp.width = LinearLayout.LayoutParams.MATCH_PARENT;
+            epgLp.height = dp2px(64);
+            epgLp.weight = 0f;
+            epgLp.setMargins(dp2px(6), dp2px(4), dp2px(6), dp2px(6));
+            applyEpgSourceSwitchLayout(epg, true);
+            // 右：频道列表占 2/5，上下撑满
+            listLp.width = 0;
+            listLp.height = LinearLayout.LayoutParams.MATCH_PARENT;
+            listLp.weight = 2f;
+            listLp.setMargins(0, 0, 0, 0);
+        } else {
+            // 竖屏还原成“视频在上、频道列表在下”
+            colLp.width = LinearLayout.LayoutParams.MATCH_PARENT;
+            colLp.height = LinearLayout.LayoutParams.WRAP_CONTENT;
+            colLp.weight = 0f;
+            colLp.setMargins(0, 0, 0, 0);
+            boxLp.width = LinearLayout.LayoutParams.MATCH_PARENT;
+            boxLp.height = dp2px(240);   // 精确高度由 applyLiveVideoBoxSize 覆盖
+            boxLp.weight = 0f;
+            epgLp.width = LinearLayout.LayoutParams.MATCH_PARENT;
+            epgLp.height = dp2px(100);
+            epgLp.weight = 0f;
+            epgLp.setMargins(dp2px(10), dp2px(10), dp2px(10), dp2px(10));
+            applyEpgSourceSwitchLayout(epg, false);
+            listLp.width = LinearLayout.LayoutParams.MATCH_PARENT;
+            listLp.height = 0;
+            listLp.weight = 1f;
+            listLp.setMargins(0, 0, 0, 0);
+        }
+        column.setLayoutParams(colLp);
+        videoBox.setLayoutParams(boxLp);
+        epg.setLayoutParams(epgLp);
+        channelList.setLayoutParams(listLp);
+    }
+
+    /**
+     * 横屏时分栏，EPG 条只有 64dp 高，源切换行不能再贴右下角（会和右上角图标行重叠），
+     * 改成与图标行同一水平线、排在图标行左侧；竖屏再还原成贴右下角。
+     */
+    private void applyEpgSourceSwitchLayout(View epg, boolean land) {
+        View sourceSwitch = epg.findViewById(R.id.ll_source_switch);
+        if (sourceSwitch == null || !(sourceSwitch.getLayoutParams() instanceof RelativeLayout.LayoutParams)) {
+            return;
+        }
+        RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams) sourceSwitch.getLayoutParams();
+        if (land) {
+            lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+            lp.addRule(RelativeLayout.CENTER_VERTICAL);
+            lp.addRule(RelativeLayout.LEFT_OF, R.id.ic_cast);
+            lp.bottomMargin = 0;
+            lp.rightMargin = dp2px(8);
+        } else {
+            lp.removeRule(RelativeLayout.CENTER_VERTICAL);
+            lp.removeRule(RelativeLayout.LEFT_OF);
+            lp.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+            lp.bottomMargin = dp2px(10);
+            lp.rightMargin = dp2px(20);
+        }
+        sourceSwitch.setLayoutParams(lp);
+    }
+
+    /**
+     * 视频区高度：竖屏按短边 16:9 自适应（不低于 240dp），横屏由 layout_weight 撑满。
+     */
+    private void applyLiveVideoBoxSize() {
+        View videoBox = findViewById(R.id.live_video_box);
+        if (videoBox == null || !(videoBox.getLayoutParams() instanceof LinearLayout.LayoutParams)) {
+            return;
+        }
+        Configuration cfg = getResources().getConfiguration();
+        if (cfg.orientation != Configuration.ORIENTATION_PORTRAIT) {
+            return;
+        }
+        int shortDp = Math.min(cfg.screenWidthDp, cfg.screenHeightDp);
+        int targetDp = Math.max(240, shortDp * 9 / 16);
+        LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) videoBox.getLayoutParams();
+        int targetPx = dp2px(targetDp);
+        if (lp.height != targetPx) {
+            lp.height = targetPx;
+            videoBox.setLayoutParams(lp);
+        }
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // 旋转不重建 Activity，布局结构要手动切换
+        applyLiveLayoutForScreen();
+    }
+
+    private int dp2px(int dp) {
+        return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     //显示底部EPG
@@ -248,7 +398,10 @@ public class LiveActivity extends BaseActivity {
             mSettingRightDialog.dismiss();
         }  else if(mAllChannelRightDialog!=null && mAllChannelRightDialog.isShow()){
             mAllChannelRightDialog.dismiss();
-        } else if (!mVideoView.onBackPressed()) {
+        } else if (mVideoView.onBackPressed()) {
+            // 退出全屏播放：全屏期间不处理布局，这里按当前方向重排一次
+            mVideoView.postDelayed(this::applyLiveLayoutForScreen, 300);
+        } else {
             super.onBackPressed();
         }
     }

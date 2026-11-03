@@ -13,7 +13,7 @@
     <!-- 外层容器铺白底：rail 自身用 marginTop 下移，避免第一个图标贴住状态栏；
          若直接把背景色放在 rail 上，下移后会露出父容器底色形成色块 -->
     <FrameLayout
-        android:layout_width="88dp"
+        android:layout_width="72dp"
         android:layout_height="match_parent"
         android:background="@color/white">
 
@@ -21,7 +21,7 @@
             android:id="@+id/nav_rail"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="24dp"
             app:itemIconSize="26dp"
             app:itemIconTint="@drawable/bottom_navigation_item_selector"
             app:itemTextColor="@drawable/bottom_navigation_item_selector"

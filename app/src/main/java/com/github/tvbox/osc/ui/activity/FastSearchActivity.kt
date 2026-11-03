@@ -1,5 +1,6 @@
 package com.github.tvbox.osc.ui.activity
 
+import android.content.res.Configuration
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextUtils
@@ -11,7 +12,9 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.TextView
 import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.angcyo.tablayout.DslTabLayout
 import com.blankj.utilcode.util.GsonUtils
 import com.blankj.utilcode.util.KeyboardUtils
@@ -36,6 +39,7 @@ import com.github.tvbox.osc.ui.dialog.SearchSuggestionsDialog
 import com.github.tvbox.osc.util.FastClickCheckUtil
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.SearchHelper
+import com.github.tvbox.osc.util.Utils
 import com.github.tvbox.osc.viewmodel.SourceViewModel
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
@@ -67,8 +71,10 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
     }
 
     private lateinit var sourceViewModel : SourceViewModel
-    private var searchAdapter = FastSearchAdapter()
-    private var searchAdapterFilter = FastSearchAdapter()
+    /** 搜索结果显示方式：true 卡片（海报网格），false 列表（左图右文）。右上角按钮可切换，选择会记住 */
+    private var cardMode: Boolean = Hawk.get(HawkConfig.SEARCH_CARD_MODE, true)
+    private var searchAdapter = FastSearchAdapter(cardMode)
+    private var searchAdapterFilter = FastSearchAdapter(cardMode)
     private var searchTitle: String? = ""
     private var spNames = HashMap<String, String>()
     private var isFilterMode = false
@@ -113,6 +119,8 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
             false
         }
         mBinding.etSearch.addTextChangedListener(this)
+        mBinding.ivViewMode.setOnClickListener { toggleViewMode() }
+        updateViewModeIcon()
         mBinding.ivFilter.setOnClickListener { filterSearchSource() }
         mBinding.ivBack.setOnClickListener { finish() }
         mBinding.ivSearch.setOnClickListener {
@@ -125,7 +133,7 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
                 }
         }
         mBinding.mGridView.setHasFixedSize(true)
-        mBinding.mGridView.setLayoutManager(LinearLayoutManager(this))
+        mBinding.mGridView.setLayoutManager(newResultLayoutManager())
         mBinding.mGridView.adapter = searchAdapter
         searchAdapter.setOnItemClickListener { _, view, position ->
             FastClickCheckUtil.check(view)
@@ -144,7 +152,7 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
             bundle.putString("sourceKey", video.sourceKey)
             jumpActivity(DetailActivity::class.java, bundle)
         }
-        mBinding.mGridViewFilter.setLayoutManager(LinearLayoutManager(this))
+        mBinding.mGridViewFilter.setLayoutManager(newResultLayoutManager())
 
         mBinding.mGridViewFilter.adapter = searchAdapterFilter
         searchAdapterFilter.setOnItemClickListener { _, view, position ->
@@ -213,6 +221,53 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
         searchFilterKey = key
         val list: List<Movie.Video> = (resultVods[key])!!
         searchAdapterFilter.setNewData(list)
+    }
+
+    /**
+     * 搜索结果列表的布局管理器：
+     * - 卡片模式：海报卡片网格，列数按屏宽自适应（与首页卡片一致，平板横屏能排更多列）
+     * - 列表模式：单列左图右文条目
+     */
+    private fun newResultLayoutManager(): RecyclerView.LayoutManager {
+        return if (cardMode) {
+            GridLayoutManager(this, Utils.getPosterSpanCount(this))
+        } else {
+            LinearLayoutManager(this)
+        }
+    }
+
+    /** 切换「卡片 / 列表」显示方式，并把选择记住 */
+    private fun toggleViewMode() {
+        cardMode = !cardMode
+        Hawk.put(HawkConfig.SEARCH_CARD_MODE, cardMode)
+        searchAdapter.setCardMode(cardMode)
+        searchAdapterFilter.setCardMode(cardMode)
+        mBinding.mGridView.layoutManager = newResultLayoutManager()
+        mBinding.mGridViewFilter.layoutManager = newResultLayoutManager()
+        updateViewModeIcon()
+        ToastUtils.showShort(if (cardMode) "已切换为卡片显示" else "已切换为列表显示")
+    }
+
+    /** 图标显示"点一下会切到的模式"：当前卡片就显示列表图标，反之显示网格图标 */
+    private fun updateViewModeIcon() {
+        mBinding.ivViewMode.setImageResource(
+            if (cardMode) R.drawable.ic_view_list else R.drawable.ic_view_grid
+        )
+    }
+
+    // 本页声明了 configChanges，旋转不会重建，列数要按新屏宽自己重算
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val spanCount = Utils.getPosterSpanCount(this)
+        updateGridSpan(mBinding.mGridView, spanCount)
+        updateGridSpan(mBinding.mGridViewFilter, spanCount)
+    }
+
+    private fun updateGridSpan(recyclerView: RecyclerView, spanCount: Int) {
+        val layoutManager = recyclerView.layoutManager
+        if (layoutManager is GridLayoutManager && layoutManager.spanCount != spanCount) {
+            layoutManager.spanCount = spanCount
+        }
     }
 
     private fun initData() {

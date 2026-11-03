@@ -11,6 +11,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import androidx.core.content.ContextCompat;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Icon;
@@ -315,6 +316,126 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
             quickLineChange();
         });
         setLoadSir(mBinding.llLayout);
+        setupTabletPreview();
+    }
+
+    /**
+     * 平板/大屏(sw600dp)详情页顶部是「左播放器 + 右影视信息」横向布局，
+     * 播放器浮层 previewPlayer 是根布局的直接子 View，需要按占位区的实际尺寸/位置贴上去。
+     * 手机布局里占位区就是全宽 300dp、浮层也是全宽 300dp，两者天然重合，无需额外处理。
+     */
+    private void setupTabletPreview() {
+        if (mBinding == null || !Utils.isTablet(this)) {
+            return;
+        }
+        isTabletScreen = true;
+        mBinding.previewPlayerPlace.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            int width = right - left;
+            // 宽度变化(旋转/分屏)要重算；宽度没变但高度不是 16:9 时(旋转回来的中间态)也要补算一次
+            if (width != oldRight - oldLeft || !isTabletPreviewSizeMatched(width)) {
+                // 布局回调里直接改 LayoutParams 容易触发重复 requestLayout，挪到下一帧
+                mBinding.previewPlayerPlace.post(this::applyTabletPreviewSize);
+            }
+        });
+        mBinding.previewPlayerPlace.post(this::applyTabletPreviewSize);
+    }
+
+    /**
+     * 占位区的高度是否已经是它当前宽度对应的 16:9。
+     */
+    private boolean isTabletPreviewSizeMatched(int width) {
+        if (width <= 0 || mBinding == null || mBinding.previewPlayerPlace == null) {
+            return true;
+        }
+        return mBinding.previewPlayerPlace.getHeight() == Math.round(width * 9f / 16f);
+    }
+
+    /**
+     * 按占位区宽度算出 16:9 高度写回，让右侧信息栏与播放器等高，然后把播放器浮层贴上去。
+     */
+    private void applyTabletPreviewSize() {
+        if (!isTabletScreen || mBinding == null || fullWindows) {
+            return;
+        }
+        View place = mBinding.previewPlayerPlace;
+        int width = place.getWidth();
+        if (width <= 0) {
+            // 宽度还没测量出来(占位区 GONE 或首帧)，下一帧再试，避免死循环只重试有限次
+            if (tabletSizeRetry++ < 5) {
+                place.post(this::applyTabletPreviewSize);
+            }
+            return;
+        }
+        tabletSizeRetry = 0;
+        int height = Math.round(width * 9f / 16f);
+        ViewGroup.LayoutParams lp = place.getLayoutParams();
+        if (lp.height != height) {
+            lp.height = height;
+            place.setLayoutParams(lp);
+        }
+        // 右侧信息栏与播放器齐平；窄屏平板的 16:9 可能只有 220dp 左右，给个下限保证按钮栏不被挤没
+        View infoColumn = findViewById(R.id.ll_info_column);
+        if (infoColumn != null) {
+            int minHeight = Math.round(getResources().getDisplayMetrics().density * 230f);
+            int columnHeight = Math.max(height, minHeight);
+            ViewGroup.LayoutParams ilp = infoColumn.getLayoutParams();
+            if (ilp.height != columnHeight) {
+                ilp.height = columnHeight;
+                infoColumn.setLayoutParams(ilp);
+            }
+        }
+        // 等这一帧布局走完再取位置，否则拿到的是旧坐标
+        place.post(this::layoutPreviewOverPlace);
+        // 旋转过程中宽度可能还会变一帧，变了就再算一次
+        place.post(() -> {
+            if (!isTabletScreen || mBinding == null || fullWindows) {
+                return;
+            }
+            if (place.getWidth() > 0 && place.getWidth() != width) {
+                applyTabletPreviewSize();
+            }
+        });
+    }
+
+    /**
+     * 把播放器浮层贴到占位区的位置上(占位区在左列，浮层是根布局的直接子 View)。
+     */
+    private void layoutPreviewOverPlace() {
+        if (!isTabletScreen || mBinding == null || fullWindows) {
+            return;
+        }
+        View place = mBinding.previewPlayerPlace;
+        int width = place.getWidth();
+        int height = place.getHeight();
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        // 用窗口坐标做差，不关心中间套了几层容器(setLoadSir 会把 llLayout 再包一层)
+        int[] placeLocation = new int[2];
+        place.getLocationInWindow(placeLocation);
+        int[] rootLocation = new int[2];
+        mBinding.getRoot().getLocationInWindow(rootLocation);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, height);
+        lp.leftMargin = placeLocation[0] - rootLocation[0];
+        lp.topMargin = placeLocation[1] - rootLocation[1];
+        mBinding.previewPlayer.setLayoutParams(lp);
+        windowsPreview = lp;
+    }
+
+    /**
+     * 旋转时 Activity 不重建(清单里声明了 configChanges)，这里主动补一次重算，
+     * 否则播放器浮层会沿用旋转前的尺寸/位置。
+     */
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (mBinding == null) {
+            return;
+        }
+        if (isTabletScreen) {
+            tabletSizeRetry = 0;
+            mBinding.previewPlayerPlace.post(this::applyTabletPreviewSize);
+        }
     }
 
     @Override
@@ -850,6 +971,9 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
     boolean fullWindows = false;
     ViewGroup.LayoutParams windowsPreview = null;
     ViewGroup.LayoutParams windowsFull = null;
+    // 平板(sw600dp)详情页为左右分栏，播放器浮层需按占位区动态定位
+    private boolean isTabletScreen = false;
+    private int tabletSizeRetry = 0;
 
     public void toggleFullPreview() {
         if (windowsPreview == null) {
@@ -863,7 +987,15 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
         //交由fragment处理播放器全屏逻辑
         playFragment.changedLandscape(fullWindows);
         //activity处理预览尺寸(全屏/非全屏预览)
-        mBinding.previewPlayer.setLayoutParams(fullWindows ? windowsFull : windowsPreview);
+        if (fullWindows) {
+            mBinding.previewPlayer.setLayoutParams(windowsFull);
+        } else {
+            mBinding.previewPlayer.setLayoutParams(windowsPreview);
+            if (isTabletScreen) {
+                // 平板预览尺寸是算出来的，旋转/分栏宽度变化后要重算一次
+                applyTabletPreviewSize();
+            }
+        }
         mBinding.mGridView.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
         mBinding.mGridViewFlag.setVisibility(fullWindows ? View.GONE : View.VISIBLE);
         findViewById(R.id.actionBtnBar).setVisibility(fullWindows ? View.GONE : View.VISIBLE);

@@ -69,4 +69,9 @@ public class HawkConfig {
      * 本项目全程竖屏，此处仅控制卡片形状与列数，不触发设备旋转。
      */
     public static final String LANDSCAPE_CARD = "landscape_card";
+    /**
+     * 搜索结果显示方式：true=卡片(海报网格)，false=列表(左图右文)。
+     * 搜索页右上角按钮可切换，选择会记住。
+     */
+    public static final String SEARCH_CARD_MODE = "search_card_mode";
 }
