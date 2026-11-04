@@ -98,12 +98,19 @@ public class UserFragment extends BaseLazyFragment {
                 }
                 Movie.Video vod = ((Movie.Video) adapter.getItem(position));
                 Bundle bundle = new Bundle();
-                if (!TextUtils.isEmpty(vod.id)) {
+                bundle.putString("title", vod.name);
+                // 推荐位的 id 不一定是真实详情 id：在线源的首页推荐里常见 "msearch:关键词" 这类搜索词条，
+                // 还有些条目 id 为空。这两种都没有详情可拉，必须走搜索页。
+                // 另外切换订阅源后，首页可能还留着上一份配置的推荐数据（site key 相同的订阅会命中同一份缓存），
+                // 其 sourceKey 在当前配置里已不存在，进详情页只会得到空内容 —— 同样退化为按片名搜索。
+                boolean isSearchEntry = TextUtils.isEmpty(vod.id)
+                        || vod.id.startsWith("msearch:")
+                        || ApiConfig.get().getSource(vod.sourceKey) == null;
+                if (!isSearchEntry) {
                     bundle.putString("id", vod.id);
                     bundle.putString("sourceKey", vod.sourceKey);
                     jumpActivity(DetailActivity.class, bundle);
                 } else {
-                    bundle.putString("title", vod.name);
                     jumpActivity(FastSearchActivity.class, bundle);
                 }
             }
