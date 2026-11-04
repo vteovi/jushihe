@@ -6,6 +6,12 @@
 - 出包入口：根目录 `编译聚视盒.bat` / `Build-MBox.ps1`。
 - 上游参考仓库（同衍生分支，壁纸/海报尺寸等功能更全）：`D:\WorkBuddy\TVBoxOS-Mobile`。本竖屏版**没有**壁纸、海报尺寸设置，`HawkConfig` 里也没有 `WALLPAPER_URL/WALLPAPER_HISTORY/POSTER_SIZE`，从上游拷代码时要剔除。
 
+## 分支流程（v1.11.6 起）
+- **`master` = 稳定版**，只接收经过实机验证的合并（GitHub 远端默认分支也是 master，不要改成 main）。
+- **`dev` = 开发/测试分支**，以后所有新功能、改造、试错都在 dev 上提交；稳定后再合回 master。
+- 合并：`git checkout master && git merge --no-ff dev`（保留合并节点，便于回溯整条功能线），合并后 master 上打 tag（如 `v1.12.0`）并推送。
+- 版本号规则不变：dev 上每次进 APK 的提交照常升 versionCode/versionName，合到 master 时版本号已经是新的，不需要再升。
+
 ## 本地文件型配置（订阅源 / 影视源 / 直播源）
 - 本地导入统一用 `util/LocalImport.kt`：复制到 `filesDir/<subDir>/`，以 `file://` 绝对路径引用（私有目录、免权限、重启不失效）。不要再写 `Android/data/<pkg>/...` + `clan://localhost/`（跨设备同步后接收端没有该文件，必然 404）。
 - `ApiConfig.loadConfig` 已支持 `assets://` / `content://` / `file://` 直接读文件；`clan://` 仍走内置 HTTP 服务的 `/file/`（外存根路径）。
