@@ -1,6 +1,7 @@
 package com.github.tvbox.osc.ui.fragment;
 
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -61,6 +62,8 @@ public class UserFragment extends BaseLazyFragment {
     private GridAdapter homeHotVodAdapter;
     private List<Movie.Video> homeSourceRec;
     RecyclerView tvHotList1;
+    /** 当前推荐网格列数，用于检测横竖屏切换 / 横版海报开关变化 */
+    private int mCurrentSpanCount = -1;
 
     public static UserFragment newInstance(List<Movie.Video> recVod) {
         return new UserFragment().setArguments(recVod);
@@ -74,9 +77,33 @@ public class UserFragment extends BaseLazyFragment {
     @Override
     protected void onFragmentResume() {
         super.onFragmentResume();
+        applyHotSpanCount();
+    }
 
+    /**
+     * 按当前屏宽重算推荐网格列数。列数没变就不重建 LayoutManager，避免每次返回都丢失滚动位置。
+     */
+    private void applyHotSpanCount() {
+        if (tvHotList1 == null || mContext == null) return;
         tvHotList1.setHasFixedSize(true);
-        tvHotList1.setLayoutManager(new GridLayoutManager(this.mContext, Utils.getPosterSpanCount(this.mContext)));
+        int span = Utils.getPosterSpanCount(mContext);
+        RecyclerView.LayoutManager lm = tvHotList1.getLayoutManager();
+        if (span == mCurrentSpanCount && lm instanceof GridLayoutManager
+                && ((GridLayoutManager) lm).getSpanCount() == span) return;
+        mCurrentSpanCount = span;
+        if (lm instanceof GridLayoutManager) {
+            ((GridLayoutManager) lm).setSpanCount(span);
+        } else {
+            tvHotList1.setLayoutManager(new GridLayoutManager(mContext, span));
+        }
+        if (homeHotVodAdapter != null) homeHotVodAdapter.notifyDataSetChanged();
+    }
+
+    @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // 清单声明了 configChanges，旋转不重建页面；立刻重算列数，无需切换分栏
+        applyHotSpanCount();
     }
 
     @Override

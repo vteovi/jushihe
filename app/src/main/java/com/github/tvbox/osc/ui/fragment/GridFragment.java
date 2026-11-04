@@ -1,5 +1,6 @@
 package com.github.tvbox.osc.ui.fragment;
 
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
@@ -184,8 +185,7 @@ public class GridFragment extends BaseLazyFragment {
     private void initView() {
         this.createView();
         mGridView.setAdapter(gridAdapter);
-        mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, Utils.getPosterSpanCount(this.mContext)));
-        mCurrentSpanCount = Utils.getPosterSpanCount(this.mContext);
+        applySpanCount();
 
         gridAdapter.setOnLoadMoreListener(new BaseQuickAdapter.RequestLoadMoreListener() {
             @Override
@@ -249,13 +249,8 @@ public class GridFragment extends BaseLazyFragment {
     @Override
     protected void onFragmentResume() {
         super.onFragmentResume();
-        // 从设置页切换"横屏海报"开关返回后，列数可能变化；仅在变化时重建，避免普通返回丢失滚动位置
-        int span = Utils.getPosterSpanCount(this.mContext);
-        if (mGridView != null && span != mCurrentSpanCount) {
-            mCurrentSpanCount = span;
-            mGridView.setLayoutManager(new V7GridLayoutManager(this.mContext, span));
-            if (gridAdapter != null) gridAdapter.notifyDataSetChanged();
-        }
+        // 从设置页切换"横屏海报"开关返回后，列数可能变化；仅在变化时更新，避免普通返回丢失滚动位置
+        applySpanCount();
         // 从其他分栏切回来时，兜底重置加载状态，防止之前的请求回调丢失导致永久卡住
         if (mLoading) {
             mLoading = false;
@@ -264,6 +259,36 @@ public class GridFragment extends BaseLazyFragment {
                 gridAdapter.setEnableLoadMore(true);
             }
         }
+    }
+
+    /**
+     * 按当前屏宽重算网格列数。只在列数真的变化时改动，避免无谓重建导致滚动位置丢失。
+     * 已有 V7GridLayoutManager 时直接 setSpanCount（保留滚动位置），否则新建一个。
+     */
+    private void applySpanCount() {
+        if (mGridView == null || mContext == null) return;
+        int span = Utils.getPosterSpanCount(mContext);
+        RecyclerView.LayoutManager lm = mGridView.getLayoutManager();
+        // 注意：changeView(进入文件夹)会新建一个 RecyclerView，此时 lm 为 null，
+        // 即使列数没变也必须给它装上 LayoutManager，不能只按 mCurrentSpanCount 提前返回
+        if (span == mCurrentSpanCount && lm instanceof V7GridLayoutManager
+                && ((V7GridLayoutManager) lm).getSpanCount() == span) return;
+        mCurrentSpanCount = span;
+        if (lm instanceof V7GridLayoutManager) {
+            ((V7GridLayoutManager) lm).setSpanCount(span);
+        } else {
+            mGridView.setLayoutManager(new V7GridLayoutManager(mContext, span));
+        }
+        if (gridAdapter != null) gridAdapter.notifyDataSetChanged();
+    }
+
+    @Override
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // 清单声明了 configChanges(orientation|screenSize)，横竖屏切换不会重建 Fragment，
+        // 也不会触发分栏切换（onFragmentResume）。必须在这里立刻重算列数，
+        // 否则要滑动到别的分类再切回来才会更新。
+        applySpanCount();
     }
 
     private void initViewModel() {
