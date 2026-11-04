@@ -26,7 +26,7 @@ public class SearchAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHolder>
     @Override
     protected void convert(BaseViewHolder helper, Movie.Video item) {
             helper.setText(R.id.tvName, item.name);
-            helper.setText(R.id.tvSite, ApiConfig.get().getSource(item.sourceKey).getName());
+            helper.setText(R.id.tvSite, ApiConfig.get().getSourceName(item.sourceKey));
             helper.setVisible(R.id.tvNote, item.note != null && !item.note.isEmpty());
             if (item.note != null && !item.note.isEmpty()) {
                 helper.setText(R.id.tvNote, item.note);

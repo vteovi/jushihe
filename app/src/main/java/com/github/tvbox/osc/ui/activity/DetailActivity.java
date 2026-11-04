@@ -649,7 +649,7 @@ public class DetailActivity extends BaseVbActivity<ActivityDetailBinding> {
                     vodInfo.sourceKey = mVideo.sourceKey;
 
                     mBinding.tvName.setText(TextUtils.isEmpty(mVideo.name) ? "暂无信息" : mVideo.name);
-                    String srcName = ApiConfig.get().getSource(mVideo.sourceKey).getName();
+                    String srcName = ApiConfig.get().getSourceName(mVideo.sourceKey);
                     mBinding.tvSite.setText("来源：" + (TextUtils.isEmpty(srcName) ? "未知" : srcName));
 
                     if (vodInfo.seriesMap != null && vodInfo.seriesMap.size() > 0) {//线路

@@ -29,7 +29,7 @@ public class CollectAdapter extends BaseQuickAdapter<VodCollect, BaseViewHolder>
         helper.setVisible(R.id.tvNote, false);
         TextView tvYear = helper.getView(R.id.tvYear);
         if (ApiConfig.get().getSource(item.sourceKey)!=null) {
-            tvYear.setText(ApiConfig.get().getSource(item.sourceKey).getName());
+            tvYear.setText(ApiConfig.get().getSourceName(item.sourceKey));
             tvYear.setVisibility(View.VISIBLE);
         } else {
             tvYear.setVisibility(View.GONE);

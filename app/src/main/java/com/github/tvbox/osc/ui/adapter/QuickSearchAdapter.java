@@ -21,7 +21,7 @@ public class QuickSearchAdapter extends BaseQuickAdapter<Movie.Video, BaseViewHo
     @Override
     protected void convert(BaseViewHolder helper, Movie.Video item) {
         // lite
-        helper.setText(R.id.tvName, String.format("%s  %s %s %s", ApiConfig.get().getSource(item.sourceKey).getName(), item.name, item.type == null ? "" : item.type, item.note == null ? "" : item.note));
+        helper.setText(R.id.tvName, String.format("%s  %s %s %s", ApiConfig.get().getSourceName(item.sourceKey), item.name, item.type == null ? "" : item.type, item.note == null ? "" : item.note));
         // with preview
         /*
         helper.setText(R.id.tvName, item.name);

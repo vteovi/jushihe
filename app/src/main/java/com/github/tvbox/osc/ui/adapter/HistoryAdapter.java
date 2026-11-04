@@ -42,7 +42,7 @@ public class HistoryAdapter extends BaseQuickAdapter<VodInfo, BaseViewHolder> {
             tvYear.setText(String.valueOf(item.year));
             tvYear.setVisibility(View.VISIBLE);
         }*/
-        tvYear.setText(ApiConfig.get().getSource(item.sourceKey).getName());
+        tvYear.setText(ApiConfig.get().getSourceName(item.sourceKey));
 
         TextView tvNote = helper.getView(R.id.tvNote);
         if (item.note == null || item.note.isEmpty()) {

@@ -29,8 +29,16 @@ public class DefaultConfig {
         List<MovieSort.SortData> data = new ArrayList<>();
         if (sourceKey != null) {
             SourceBean sb = ApiConfig.get().getSource(sourceKey);
-            ArrayList<String> categories = sb.getCategories();
-            if (!categories.isEmpty()) {
+            // 切换订阅源后，Hawk 里记录的主页源 key 可能在新订阅里已经不存在（源被删/改名），
+            // getSource 会返回 null。旧代码直接 sb.getCategories() 会崩，这里退化为「全部分栏」。
+            ArrayList<String> categories = sb == null ? null : sb.getCategories();
+            if (categories == null || categories.isEmpty()) {
+                for (MovieSort.SortData sortData : list) {
+                    if (sortData.filters == null)
+                        sortData.filters = new ArrayList<>();
+                    data.add(sortData);
+                }
+            } else {
                 for (String cate : categories) {
                     for (MovieSort.SortData sortData : list) {
                         if (sortData.name.equals(cate)) {
@@ -39,12 +47,6 @@ public class DefaultConfig {
                             data.add(sortData);
                         }
                     }
-                }
-            } else {
-                for (MovieSort.SortData sortData : list) {
-                    if (sortData.filters == null)
-                        sortData.filters = new ArrayList<>();
-                    data.add(sortData);
                 }
             }
         }

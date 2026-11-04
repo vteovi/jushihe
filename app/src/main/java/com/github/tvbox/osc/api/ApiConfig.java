@@ -767,6 +767,18 @@ public class ApiConfig {
         return sourceBeanList.get(key);
     }
 
+    /**
+     * 安全取数据源名称。
+     *
+     * 切换订阅源后，收藏/历史/搜索结果里残留的 sourceKey 可能在新订阅中已不存在，
+     * 此时 {@link #getSource(String)} 返回 null，直接链式调用 getName() 会崩。
+     * 这里统一兜底成空串，调用方按需显示「未知」。
+     */
+    public String getSourceName(String key) {
+        SourceBean bean = getSource(key);
+        return bean == null || bean.getName() == null ? "" : bean.getName();
+    }
+
     public void setSourceBean(SourceBean sourceBean) {
         this.mHomeSource = sourceBean;
         Hawk.put(HawkConfig.HOME_API, sourceBean.getKey());
