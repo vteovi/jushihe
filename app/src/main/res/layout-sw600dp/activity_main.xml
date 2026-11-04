@@ -10,25 +10,21 @@
     android:orientation="horizontal"
     tools:context=".ui.activity.MainActivity">
 
-    <!-- 外层容器铺白底：rail 自身用 marginTop 下移，避免第一个图标贴住状态栏；
-         若直接把背景色放在 rail 上，下移后会露出父容器底色形成色块 -->
-    <FrameLayout
+    <!-- 整条 rail 铺满屏幕高度（含状态栏区域）：以前用 marginTop 把 rail 下移，
+         会在 rail 的上边缘留下一条阴影/分界线。现在改成背景一直顶到屏幕顶端，
+         只用 paddingTop 把菜单图标和文字挤到状态栏下方（真实高度在 MainActivity 里按
+         WindowInsets 的 statusBars inset 再算一次，这里 32dp 只是兜底值）。 -->
+    <com.google.android.material.navigationrail.NavigationRailView
+        android:id="@+id/nav_rail"
         android:layout_width="72dp"
         android:layout_height="match_parent"
-        android:background="@color/white">
-
-        <com.google.android.material.navigationrail.NavigationRailView
-            android:id="@+id/nav_rail"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginTop="24dp"
-            app:itemIconSize="26dp"
-            app:itemIconTint="@drawable/bottom_navigation_item_selector"
-            app:itemTextColor="@drawable/bottom_navigation_item_selector"
-            app:labelVisibilityMode="labeled"
-            app:menu="@menu/main_bottom_navigation" />
-
-    </FrameLayout>
+        android:background="@color/white"
+        android:paddingTop="32dp"
+        app:itemIconSize="26dp"
+        app:itemIconTint="@drawable/bottom_navigation_item_selector"
+        app:itemTextColor="@drawable/bottom_navigation_item_selector"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/main_bottom_navigation" />
 
     <androidx.viewpager.widget.ViewPager
         android:id="@+id/vp"

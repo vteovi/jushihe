@@ -1,5 +1,6 @@
 package com.github.tvbox.osc.ui.activity
 
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.View
 import androidx.lifecycle.lifecycleScope
@@ -29,7 +30,9 @@ class HistoryActivity : BaseVbActivity<ActivityHistoryBinding>() {
         setLoadSir(mBinding.mGridView)
 
         mBinding.mGridView.setHasFixedSize(true)
-        mBinding.mGridView.setLayoutManager(GridLayoutManager(this, 3))
+        // 列数按屏宽自适应：横版 16:9 海报在手机竖屏只排 1 列（原来写死 3 列，卡片太小看不清），
+        // 竖版 2:3 海报至少 2 列，平板/横屏随宽度增到 4~6 列
+        mBinding.mGridView.setLayoutManager(GridLayoutManager(this, Utils.getPosterSpanCount(this)))
         historyAdapter = HistoryAdapter()
         mBinding.mGridView.setAdapter(historyAdapter)
 
@@ -74,6 +77,13 @@ class HistoryActivity : BaseVbActivity<ActivityHistoryBinding>() {
                 bundle.putString("sourceKey", vodInfo.sourceKey)
                 jumpActivity(DetailActivity::class.java, bundle)
             }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // 清单声明了 configChanges，旋转不重建页面，需手动更新列数
+        (mBinding.mGridView.layoutManager as? GridLayoutManager)?.spanCount =
+            Utils.getPosterSpanCount(this)
     }
 
     private fun initData() {
