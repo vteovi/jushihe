@@ -2,6 +2,10 @@
     <!--  app名称   -->
     <string name="app_name">聚视盒</string>
 
+    <!--  关于对话框：本项目的实际仓库地址  -->
+    <string name="about_project_url">https://github.com/vteovi/jushihe</string>
+    <string name="about_open_project">访问项目</string>
+
     <string name="about">基于TVBox开发，代码开源，不收集或上传任何数据。
         \n软件只提供展示功能，不参与任何订阅源的制作、收集和发布。
         \n开发者不对任何订阅内容负责。

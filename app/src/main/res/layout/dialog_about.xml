@@ -55,12 +55,28 @@
         />
 
     <TextView
-        android:layout_width="wrap_content"
+        android:id="@+id/tv_project_url"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="https://github.com/XiaoRanLiu3119/TVBoxOS-Mobile"
-        android:textIsSelectable="true"
+        android:layout_marginTop="4dp"
+        android:text="@string/about_project_url"
         android:textColor="@color/text_sub_foreground"
-        android:layout_marginTop="4dp"/>
+        android:textIsSelectable="true" />
+
+    <TextView
+        android:id="@+id/btn_open_project"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_about_project_btn"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:text="@string/about_open_project"
+        android:textColor="@color/white"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
