@@ -8,8 +8,8 @@ android {
         applicationId 'com.jushihe.tvbox'
         minSdkVersion 24
         targetSdkVersion 34
-        versionCode 97
-        versionName '1.11.4'
+        versionCode 98
+        versionName '1.11.5'
         multiDexEnabled true
         //设置room的Schema的位置
         javaCompileOptions {
