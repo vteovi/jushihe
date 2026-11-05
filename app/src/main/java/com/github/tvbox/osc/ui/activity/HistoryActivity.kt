@@ -45,6 +45,7 @@ class HistoryActivity : BaseVbActivity<ActivityHistoryBinding>() {
                 if (historyAdapter!!.data.isEmpty()) {
                     mBinding.topTip.visibility = View.GONE
                 }
+                updateTitleCount(historyAdapter!!.data.size)
                 true
             }
 
@@ -62,6 +63,7 @@ class HistoryActivity : BaseVbActivity<ActivityHistoryBinding>() {
                             historyAdapter!!.setNewData(ArrayList())
                             mBinding.topTip.visibility = View.GONE
                             showEmpty()
+                            updateTitleCount(0)
                         }
                     }
 
@@ -86,6 +88,11 @@ class HistoryActivity : BaseVbActivity<ActivityHistoryBinding>() {
             Utils.getPosterSpanCount(this)
     }
 
+    /** 标题栏显示当前历史记录条数，如「历史记录（36）」；没有数据时退回纯标题 */
+    private fun updateTitleCount(count: Int) {
+        mBinding.titleBar.setTitle(if (count > 0) "历史记录（$count）" else "历史记录")
+    }
+
     private fun initData() {
 
         lifecycleScope.launch(Dispatchers.IO) {
@@ -99,6 +106,7 @@ class HistoryActivity : BaseVbActivity<ActivityHistoryBinding>() {
 
             withContext(Dispatchers.Main) {
                 historyAdapter!!.setNewData(vodInfoList)
+                updateTitleCount(vodInfoList.size)
                 if (vodInfoList.isNotEmpty()) {
                     showSuccess()
                     mBinding.topTip.visibility = View.VISIBLE

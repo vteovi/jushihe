@@ -50,6 +50,7 @@ class CollectActivity : BaseVbActivity<ActivityCollectBinding>() {
                             collectAdapter.setNewData(ArrayList())
                             mBinding.topTip.visibility = View.GONE
                             showEmpty()
+                            updateTitleCount(0)
                         }
                     }
                 }.show()
@@ -64,6 +65,7 @@ class CollectActivity : BaseVbActivity<ActivityCollectBinding>() {
                 if (collectAdapter.data.isEmpty()) {
                     mBinding.topTip.visibility = View.GONE
                 }
+                updateTitleCount(collectAdapter.data.size)
                 true
             }
         collectAdapter.onItemClickListener =
@@ -94,6 +96,11 @@ class CollectActivity : BaseVbActivity<ActivityCollectBinding>() {
             Utils.getPosterSpanCount(this)
     }
 
+    /** 标题栏显示当前收藏数量，如「收藏（12）」；没有数据时退回纯标题 */
+    private fun updateTitleCount(count: Int) {
+        mBinding.titleBar.setTitle(if (count > 0) "收藏（$count）" else "收藏")
+    }
+
     private fun initData() {
         lifecycleScope.launch(Dispatchers.IO) {
             val allVodRecord = RoomDataManger.getAllVodCollect()
@@ -103,6 +110,7 @@ class CollectActivity : BaseVbActivity<ActivityCollectBinding>() {
             }
             withContext(Dispatchers.Main) {
                 collectAdapter.setNewData(vodInfoList)
+                updateTitleCount(vodInfoList.size)
                 if (vodInfoList.isNotEmpty()) {
                     showSuccess()
                     mBinding.topTip.visibility = View.VISIBLE
