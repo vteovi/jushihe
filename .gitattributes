@@ -1,0 +1,7 @@
+# 固定行尾，避免 Windows 编辑后 CI(Linux) 上的 gradlew 出现 bad interpreter
+gradlew text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf

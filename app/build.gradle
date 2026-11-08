@@ -46,7 +46,8 @@ android {
         config {
             keyAlias 'TVBoxOSC'
             keyPassword 'TVBoxOSC'
-            storeFile file('..\\TVBoxOSC.jks')
+            // 用正斜杠 + rootProject，保证 Windows 本地与 Linux(CI) 都能定位到根目录签名文件
+            storeFile rootProject.file('TVBoxOSC.jks')
             storePassword 'TVBoxOSC'
         }
     }
