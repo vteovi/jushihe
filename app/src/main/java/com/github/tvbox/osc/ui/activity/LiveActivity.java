@@ -1197,6 +1197,18 @@ public class LiveActivity extends BaseActivity {
         mHandler.postDelayed(mHideSettingLayoutRun, 5000);
     }
 
+    /**
+     * 配置里只有一条指向本机 proxy 的频道组时，那是个「直播源地址」占位，
+     * 需要拉下来解析成真正的频道列表，而不是当成普通频道组。
+     */
+    private boolean isProxyOnlyGroupList(List<LiveChannelGroup> list) {
+        if (list == null || list.size() != 1) {
+            return false;
+        }
+        String groupName = list.get(0).getGroupName();
+        return groupName != null && groupName.startsWith("http://127.0.0.1");
+    }
+
     private void initLiveChannelList() {
         List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
         if (list.isEmpty()) {
@@ -1204,7 +1216,7 @@ public class LiveActivity extends BaseActivity {
             return;
         }
 
-        if (list.size() == 1 && list.get(0).getGroupName().startsWith("http://127.0.0.1")) {
+        if (isProxyOnlyGroupList(list)) {
             loadProxyLives(list.get(0).getGroupName());
         }
         else {
@@ -1251,10 +1263,22 @@ public class LiveActivity extends BaseActivity {
      * 而不是抛个弹窗把页面留在 loading 上。
      */
     private void parseProxyLiveContent(String content) {
-        LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> linkedHashMap = new LinkedHashMap<>();
-        TxtSubscribe.parse(linkedHashMap, content);
-        JsonArray livesArray = TxtSubscribe.live2JsonArray(linkedHashMap);
-        ApiConfig.get().loadLives(livesArray);
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        try {
+            LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> linkedHashMap = new LinkedHashMap<>();
+            TxtSubscribe.parse(linkedHashMap, content);
+            JsonArray livesArray = TxtSubscribe.live2JsonArray(linkedHashMap);
+            ApiConfig.get().loadLives(livesArray);
+        } catch (Throwable th) {
+            th.printStackTrace();
+            mHandler.post(() -> {
+                ToastUtils.showShort("直播源解析失败，试试换个直播源");
+                showNoLiveChannels();
+            });
+            return;
+        }
         List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
         if (list.isEmpty()) {
             mHandler.post(LiveActivity.this::showNoLiveChannels);
@@ -1262,13 +1286,13 @@ public class LiveActivity extends BaseActivity {
         }
         liveChannelGroupList.clear();
         liveChannelGroupList.addAll(list);
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                noLiveChannelsShown = false;
-                LiveActivity.this.showSuccess();
-                initLiveState();
+        mHandler.post(() -> {
+            if (isFinishing() || isDestroyed()) {
+                return;
             }
+            noLiveChannelsShown = false;
+            showSuccess();
+            initLiveState();
         });
     }
 
@@ -1344,15 +1368,22 @@ public class LiveActivity extends BaseActivity {
             @Override
             public void success() {
                 mHandler.post(() -> {
-                    liveChannelGroupList.clear();
-                    liveChannelGroupList.addAll(ApiConfig.get().getChannelGroupList());
-                    if (liveChannelGroupList.isEmpty()) {
+                    List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
+                    if (list.isEmpty()) {
+                        liveChannelGroupList.clear();
                         showNoLiveChannels();
-                    } else {
-                        noLiveChannelsShown = false;
-                        showSuccess();
-                        initLiveState();
+                        return;
                     }
+                    // 订阅自带直播源时这里只有一条 proxy 占位组，得再去拉一次真实频道列表
+                    if (isProxyOnlyGroupList(list)) {
+                        loadProxyLives(list.get(0).getGroupName());
+                        return;
+                    }
+                    liveChannelGroupList.clear();
+                    liveChannelGroupList.addAll(list);
+                    noLiveChannelsShown = false;
+                    showSuccess();
+                    initLiveState();
                 });
             }
 
@@ -1371,6 +1402,10 @@ public class LiveActivity extends BaseActivity {
     }
 
     private void initLiveState() {
+        if (liveChannelGroupList.isEmpty()) {
+            showNoLiveChannels();
+            return;
+        }
         String lastChannelName = Hawk.get(HawkConfig.LIVE_CHANNEL, "");
 
         int lastChannelGroupIndex = -1;

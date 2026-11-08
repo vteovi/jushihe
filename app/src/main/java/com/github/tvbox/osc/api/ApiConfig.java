@@ -595,6 +595,10 @@ public class ApiConfig {
                 if (!StringUtils.isBlank(liveURL_final)) {
                     String proxyLiveUrl = Base64.encodeToString(liveURL_final.getBytes("UTF-8"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP);
                     LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
+                    // 节目单分组要填全字段：密码没设过是 null，LiveActivity 里
+                    // getGroupPassword().isEmpty() 会直接 NPE（v1.16.1 直播页闪退就是这个）
+                    liveChannelGroup.setGroupIndex(0);
+                    liveChannelGroup.setGroupPassword("");
                     liveChannelGroup.setGroupName("http://127.0.0.1:9978/proxy?do=live&type=txt&ext=" + proxyLiveUrl);
                     liveChannelGroupList.add(liveChannelGroup);
                 }

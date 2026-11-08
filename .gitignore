@@ -98,3 +98,5 @@ lint/tmp/
 /app/release/
 /.idea/
 *.jks
+# 本地下载的构建产物（云端 CI 出来的 APK）
+/dist/

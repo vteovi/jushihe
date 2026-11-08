@@ -40,8 +40,12 @@ public class LiveChannelGroup {
         this.liveChannelItems = liveChannelItems;
     }
 
+    /**
+     * 分组密码。任何来源（尤其程序里手工构造的频道组）都可能没设过密码，
+     * 这里统一兜底成空串，避免各处 getGroupPassword().isEmpty() 抛 NPE。
+     */
     public String getGroupPassword() {
-        return groupPassword;
+        return groupPassword == null ? "" : groupPassword;
     }
 
     public void setGroupPassword(String groupPassword) {
