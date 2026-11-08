@@ -100,7 +100,14 @@ public class App extends MultiDexApplication {
      * 老用户升级后只补一次新增的默认源（按 URL 去重），之后不再回填，
      * 避免用户手动删掉的源每次启动又冒出来。
      */
-    private static final int BUILTIN_SUBS_VERSION = 1;
+    private static final int BUILTIN_SUBS_VERSION = 2;
+
+    /**
+     * v1.16.0 之前的默认源（龙门影视）。
+     * 默认源改成饭太硬后，只有"还停在这个旧默认源上"的用户会被切到新默认源，
+     * 自己手动选过其它源的不动。
+     */
+    private static final String LEGACY_DEFAULT_API = "http://box.iqinu.com";
 
     private void putDefaultApi() {
         String[] apis = getResources().getStringArray(R.array.api);
@@ -152,6 +159,22 @@ public class App extends MultiDexApplication {
             subscriptions.get(0).setChecked(true);
             Hawk.put(HawkConfig.API_URL, subscriptions.get(0).getUrl());
             changed = true;
+        }
+        // 默认源换成饭太硬：只切换"仍停在旧内置默认源"的用户
+        String currentApi = Hawk.get(HawkConfig.API_URL, "");
+        if (LEGACY_DEFAULT_API.equals(currentApi)) {
+            for (Subscription item : subscriptions) {
+                if (item == null || !apis[0].equals(item.getUrl())) continue;
+                for (Subscription other : subscriptions) {
+                    if (other != null) {
+                        other.setChecked(false);
+                    }
+                }
+                item.setChecked(true);
+                Hawk.put(HawkConfig.API_URL, apis[0]);
+                changed = true;
+                break;
+            }
         }
         if (changed) {
             Hawk.put(HawkConfig.SUBSCRIPTIONS, subscriptions);

@@ -41,17 +41,19 @@
     </string-array>
 
     <!-- 内置默认订阅源,与 api_names 一一对应(顺序必须一致) -->
+    <!-- 内置订阅源: 数组顺序即列表顺序, 第一个为首次安装的默认选中源 -->
     <string-array name="api">
-        <item>http://box.iqinu.com</item>
         <item>http://www.饭太硬.cc/tv</item>
+        <item>http://box.iqinu.com</item>
         <item>http://www.饭太硬.com/tv/</item>
         <item>http://cdn.qiaoji8.com/tvbox.json</item>
         <item>http://tv.nxog.top/m/</item>
     </string-array>
 
+    <!-- 与 api 数组同序等长 -->
     <string-array name="api_names">
-        <item>龙门影视</item>
         <item>饭太硬</item>
+        <item>龙门影视</item>
         <item>饭太硬(备用)</item>
         <item>巧技</item>
         <item>讴歌</item>
