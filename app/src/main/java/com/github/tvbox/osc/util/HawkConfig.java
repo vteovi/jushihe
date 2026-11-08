@@ -74,4 +74,9 @@ public class HawkConfig {
      * 搜索页右上角按钮可切换，选择会记住。
      */
     public static final String SEARCH_CARD_MODE = "search_card_mode";
+    /**
+     * 内置默认订阅源的版本号：升级后首次启动会把新增的默认源补进订阅列表，
+     * 补过一次就不再重复补，避免用户手动删掉的源每次启动又冒出来。
+     */
+    public static final String DEFAULT_SUBS_VERSION = "default_subs_version";
 }

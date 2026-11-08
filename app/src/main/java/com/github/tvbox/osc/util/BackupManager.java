@@ -83,7 +83,9 @@ public class BackupManager {
             HawkConfig.HISTORY_SEARCH,
             HawkConfig.LANDSCAPE_CARD,
             HawkConfig.SHOW_PREVIEW,
-            HawkConfig.DEBUG_OPEN
+            HawkConfig.DEBUG_OPEN,
+            // 备份还原时一起带上，避免还原后又把默认订阅源补一遍
+            HawkConfig.DEFAULT_SUBS_VERSION
     };
 
     /**

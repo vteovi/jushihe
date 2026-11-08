@@ -26,7 +26,9 @@ import com.p2p.P2PClass;
 import com.whl.quickjs.android.QuickJSLoader;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import cat.ereza.customactivityoncrash.config.CaocConfig;
 import me.jessyan.autosize.AutoSizeConfig;
@@ -91,20 +93,78 @@ public class App extends MultiDexApplication {
         putDefaultApi();
     }
 
+    /**
+     * 内置默认订阅源版本：增删 strings.xml 里的 api 数组后 +1。
+     * 老用户升级后只补一次新增的默认源（按 URL 去重），之后不再回填，
+     * 避免用户手动删掉的源每次启动又冒出来。
+     */
+    private static final int BUILTIN_SUBS_VERSION = 1;
+
     private void putDefaultApi() {
         String[] apis = getResources().getStringArray(R.array.api);
-        if(!Hawk.contains(HawkConfig.API_URL) && !Hawk.contains(HawkConfig.SUBSCRIPTIONS) && !TextUtils.isEmpty(apis[0])){
+        String[] names = getResources().getStringArray(R.array.api_names);
+        if (apis.length == 0 || TextUtils.isEmpty(apis[0])) return;
+
+        // 首次安装（还没有订阅列表）：直接按默认列表生成
+        if (!Hawk.contains(HawkConfig.SUBSCRIPTIONS)) {
             List<Subscription> subscriptions = new ArrayList<>();
             for (int i = 0; i < apis.length; i++) {
-                if (i==0){
-                    subscriptions.add(new Subscription("订阅: 1", apis[0]).setChecked(true));
-                    Hawk.put(HawkConfig.API_URL,apis[0]);
-                }else {
-                    subscriptions.add(new Subscription("订阅: "+(i+1), apis[i]));
+                if (TextUtils.isEmpty(apis[i])) continue;
+                Subscription subscription = new Subscription(subName(names, i, subscriptions.size()), apis[i]);
+                if (subscriptions.isEmpty() && TextUtils.isEmpty(Hawk.get(HawkConfig.API_URL, ""))) {
+                    subscription.setChecked(true);
+                    Hawk.put(HawkConfig.API_URL, apis[i]);
                 }
+                subscriptions.add(subscription);
             }
-            Hawk.put(HawkConfig.SUBSCRIPTIONS,subscriptions);
+            Hawk.put(HawkConfig.SUBSCRIPTIONS, subscriptions);
+            Hawk.put(HawkConfig.DEFAULT_SUBS_VERSION, BUILTIN_SUBS_VERSION);
+            return;
         }
+
+        // 老用户升级：补一次新增的默认源
+        int applied = Hawk.get(HawkConfig.DEFAULT_SUBS_VERSION, 0);
+        if (applied >= BUILTIN_SUBS_VERSION) return;
+        List<Subscription> subscriptions = Hawk.get(HawkConfig.SUBSCRIPTIONS, new ArrayList<Subscription>());
+        if (subscriptions == null) {
+            subscriptions = new ArrayList<>();
+        }
+        Set<String> existUrls = new HashSet<>();
+        for (Subscription item : subscriptions) {
+            if (item != null && item.getUrl() != null) {
+                existUrls.add(item.getUrl());
+            }
+        }
+        boolean changed = false;
+        for (int i = 0; i < apis.length; i++) {
+            if (TextUtils.isEmpty(apis[i]) || existUrls.contains(apis[i])) continue;
+            subscriptions.add(new Subscription(subName(names, i, subscriptions.size()), apis[i]));
+            existUrls.add(apis[i]);
+            changed = true;
+        }
+        // 之前一个源都没选中（比如被删光了），补完后默认用第一个
+        if (TextUtils.isEmpty(Hawk.get(HawkConfig.API_URL, "")) && !subscriptions.isEmpty()) {
+            for (Subscription item : subscriptions) {
+                item.setChecked(false);
+            }
+            subscriptions.get(0).setChecked(true);
+            Hawk.put(HawkConfig.API_URL, subscriptions.get(0).getUrl());
+            changed = true;
+        }
+        if (changed) {
+            Hawk.put(HawkConfig.SUBSCRIPTIONS, subscriptions);
+        }
+        Hawk.put(HawkConfig.DEFAULT_SUBS_VERSION, BUILTIN_SUBS_VERSION);
+    }
+
+    /**
+     * 取订阅显示名称：优先用 api_names 对应的名字，缺失时退回「订阅: N」
+     */
+    private String subName(String[] names, int index, int fallbackIndex) {
+        if (names != null && index < names.length && !TextUtils.isEmpty(names[index])) {
+            return names[index];
+        }
+        return "订阅: " + (fallbackIndex + 1);
     }
 
     public static App getInstance() {
