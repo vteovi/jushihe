@@ -81,6 +81,10 @@ import com.owen.tvrecyclerview.widget.V7LinearLayoutManager;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -1238,6 +1242,39 @@ public class LiveActivity extends BaseActivity {
             return;
         }
         showLoading();
+        // 本地导入的直播源（私有目录 file:// 或 SAF content://）不能走网络，直接读文件
+        if (realUrl.startsWith("content://") || realUrl.startsWith("file://")) {
+            final String localUrl = realUrl;
+            new Thread(() -> {
+                String content;
+                try {
+                    InputStream input = localUrl.startsWith("file://")
+                            ? new FileInputStream(Uri.parse(localUrl).getPath())
+                            : getContentResolver().openInputStream(Uri.parse(localUrl));
+                    if (input == null) {
+                        throw new IllegalStateException("open local live file failed");
+                    }
+                    StringBuilder builder = new StringBuilder();
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, "UTF-8"))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            builder.append(line).append('\n');
+                        }
+                    }
+                    content = builder.toString();
+                } catch (Throwable error) {
+                    error.printStackTrace();
+                    mHandler.post(() -> {
+                        ToastUtils.showShort("本地直播源读取失败");
+                        showNoLiveChannels();
+                    });
+                    return;
+                }
+                final String text = content;
+                mHandler.post(() -> parseProxyLiveContent(text));
+            }).start();
+            return;
+        }
         OkGo.<String>get(realUrl).tag(this).execute(new AbsCallback<String>() {
 
             @Override
@@ -1280,7 +1317,17 @@ public class LiveActivity extends BaseActivity {
             return;
         }
         List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
-        if (list.isEmpty()) {
+        int channelCount = 0;
+        for (LiveChannelGroup group : list) {
+            channelCount += group.getLiveChannels().size();
+        }
+        System.out.println("[Live] content len=" + (content == null ? 0 : content.length())
+                + " groups=" + list.size() + " channels=" + channelCount);
+        if (list.isEmpty() || channelCount == 0) {
+            // 解析不出频道时，把内容开头打出来方便排查格式（m3u / txt / json）
+            if (content != null && !content.isEmpty()) {
+                System.out.println("[Live] head=" + content.substring(0, Math.min(200, content.length())).replace("\n", " | "));
+            }
             mHandler.post(LiveActivity.this::showNoLiveChannels);
             return;
         }
