@@ -4,13 +4,18 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.IntEvaluator;
 import android.animation.ObjectAnimator;
+import android.app.PictureInPictureParams;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.Configuration;
+import android.net.TrafficStats;
 import android.net.Uri;
 import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.util.Base64;
+import android.util.Rational;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
@@ -58,6 +63,8 @@ import com.github.tvbox.osc.ui.widget.PlayerMenuView;
 import com.github.tvbox.osc.ui.widget.PlayerTitleView;
 import com.github.tvbox.osc.util.FastClickCheckUtil;
 import com.github.tvbox.osc.util.HawkConfig;
+import com.github.tvbox.osc.util.PlayerHelper;
+import com.github.tvbox.osc.util.Utils;
 import com.github.tvbox.osc.util.live.TxtSubscribe;
 import com.google.gson.JsonArray;
 import com.gyf.immersionbar.BarHide;
@@ -121,6 +128,16 @@ public class LiveActivity extends BaseActivity {
     private List<LiveChannelGroup> liveChannelGroupList = new ArrayList<>();
     /** 空状态是否已展示，避免重复 showCallback 闪烁 */
     private boolean noLiveChannelsShown;
+
+    // 画面叠加信息: 当前时间 / 当前网速(直播设置-偏好设置)
+    private TextView mTvLiveTime = null;
+    private TextView mTvLiveSpeed = null;
+    private final SimpleDateFormat mLiveTimeFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+    private boolean mLiveInfoTicking = false;
+    private long mLastRxBytes = -1;
+    private long mLastRxTime = 0;
+    /** 画中画模式(小窗)，用于避免 PiP 期间暂停播放、以及退出时还原布局 */
+    private boolean mInPip = false;
     private int currentLiveChannelIndex = -1;
     private int currentLiveChangeSourceTimes = 0;
     private LiveChannelItem currentLiveChannelItem = null;
@@ -204,13 +221,29 @@ public class LiveActivity extends BaseActivity {
 
         tv_srcinfo = findViewById(R.id.tv_source);//线路状态
 
+        //画面叠加信息(时间/网速)
+        mTvLiveTime = findViewById(R.id.tv_live_time);
+        mTvLiveSpeed = findViewById(R.id.tv_live_speed);
+
         //源切换
         findViewById(R.id.ic_pre_source).setOnClickListener(view -> playPreSource());
         findViewById(R.id.ic_next_source).setOnClickListener(view -> playNextSource());
         tv_srcinfo.setOnClickListener(view -> playNextSource());
-        //投屏/设置
+        //投屏/设置(投屏入口在播放器控制条上，EPG 条这里腾出位置给切换直播源/画中画)
         findViewById(R.id.ic_setting).setOnClickListener(view -> showSettingDialog(false));
-        findViewById(R.id.ic_cast).setOnClickListener(view -> showCastDialog());
+        findViewById(R.id.ic_cast).setVisibility(View.GONE);
+        //切换直播源(历史源列表)
+        findViewById(R.id.ic_live_source).setOnClickListener(view -> showLiveSourceDialog());
+        //画中画小窗
+        ImageView icPip = findViewById(R.id.ic_pip);
+        if (icPip != null) {
+            if (Utils.supportsPiPMode()) {
+                icPip.setVisibility(View.VISIBLE);
+                icPip.setOnClickListener(view -> enterPip());
+            } else {
+                icPip.setVisibility(View.GONE);
+            }
+        }
 
         initVideoView();
         initChannelGroupView();
@@ -220,6 +253,8 @@ public class LiveActivity extends BaseActivity {
         initLiveChannelList();
         initLiveSettingGroupList();
         applyLiveLayoutForScreen();
+        //画面叠加信息(时间/网速)每秒刷新，设置里开关改了无需额外通知即刻生效
+        startLiveInfoTicker();
     }
 
     /**
@@ -323,7 +358,7 @@ public class LiveActivity extends BaseActivity {
         if (land) {
             lp.removeRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
             lp.addRule(RelativeLayout.CENTER_VERTICAL);
-            lp.addRule(RelativeLayout.LEFT_OF, R.id.ic_cast);
+            lp.addRule(RelativeLayout.LEFT_OF, R.id.ic_live_source);
             lp.bottomMargin = 0;
             lp.rightMargin = dp2px(8);
         } else {
@@ -367,6 +402,208 @@ public class LiveActivity extends BaseActivity {
 
     private int dp2px(int dp) {
         return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    // ---------------------------------------------------------------- 画面叠加信息
+
+    private final Runnable mLiveInfoTickRun = new Runnable() {
+        @Override
+        public void run() {
+            if (!mLiveInfoTicking) {
+                return;
+            }
+            updateLiveInfoOverlay();
+            mHandler.postDelayed(this, 1000);
+        }
+    };
+
+    private void startLiveInfoTicker() {
+        if (mLiveInfoTicking) {
+            return;
+        }
+        mLiveInfoTicking = true;
+        mHandler.removeCallbacks(mLiveInfoTickRun);
+        mHandler.post(mLiveInfoTickRun);
+    }
+
+    private void stopLiveInfoTicker() {
+        mLiveInfoTicking = false;
+        mHandler.removeCallbacks(mLiveInfoTickRun);
+    }
+
+    /**
+     * 刷新画面叠加信息(时间/网速)。
+     * 每次刷新都重新读开关，所以在哪个入口改设置（直播页内嵌设置 / 设置弹窗）都能立即生效。
+     */
+    private void updateLiveInfoOverlay() {
+        if (mTvLiveTime != null) {
+            boolean showTime = Hawk.get(HawkConfig.LIVE_SHOW_TIME, false);
+            mTvLiveTime.setVisibility(showTime ? View.VISIBLE : View.GONE);
+            if (showTime) {
+                mTvLiveTime.setText(mLiveTimeFormat.format(new Date()));
+            }
+        }
+        if (mTvLiveSpeed != null) {
+            boolean showSpeed = Hawk.get(HawkConfig.LIVE_SHOW_NET_SPEED, false);
+            mTvLiveSpeed.setVisibility(showSpeed ? View.VISIBLE : View.GONE);
+            if (showSpeed) {
+                String text = PlayerHelper.getDisplaySpeed(getCurrentNetSpeed());
+                if (TextUtils.isEmpty(text)) {
+                    text = "0B/s";
+                }
+                mTvLiveSpeed.setText(text);
+            }
+        }
+    }
+
+    /**
+     * 当前播放网速：优先用播放器上报的 TCP 速度；
+     * 系统播放器等不上报时，用进程 UID 的接收流量差分兜底，避免打开"显示网速"后一直空白。
+     */
+    private long getCurrentNetSpeed() {
+        long tcpSpeed = mVideoView != null ? mVideoView.getTcpSpeed() : 0;
+        if (tcpSpeed > 0) {
+            return tcpSpeed;
+        }
+        long rxBytes = TrafficStats.getUidRxBytes(getApplicationInfo().uid);
+        long now = System.currentTimeMillis();
+        long speed = 0;
+        if (rxBytes != TrafficStats.UNSUPPORTED && mLastRxBytes >= 0 && now > mLastRxTime) {
+            long delta = rxBytes - mLastRxBytes;
+            if (delta > 0) {
+                speed = delta * 1000L / (now - mLastRxTime);
+            }
+        }
+        mLastRxBytes = rxBytes == TrafficStats.UNSUPPORTED ? -1 : rxBytes;
+        mLastRxTime = now;
+        return speed;
+    }
+
+    /**
+     * dkplayer 全屏是把播放器容器搬进 DecorView，Activity 布局里的控件不会跟着走，
+     * 所以全屏时要把时间/网速挪到播放器容器上，退出全屏再挪回来。
+     */
+    private void relocateLiveInfoOverlay(boolean fullScreen) {
+        if (mTvLiveTime == null || mVideoView == null) {
+            return;
+        }
+        ViewGroup host = fullScreen
+                ? mVideoView.getPlayerContainer()
+                : (mVideoView.getParent() instanceof ViewGroup ? (ViewGroup) mVideoView.getParent() : null);
+        if (host == null) {
+            return;
+        }
+        moveInfoView(mTvLiveTime, host, true);
+        moveInfoView(mTvLiveSpeed, host, false);
+    }
+
+    /**
+     * @param timeView true=时间 false=网速(网速紧跟在时间下方)
+     */
+    private void moveInfoView(View view, ViewGroup host, boolean timeView) {
+        if (view == null || host == null) {
+            return;
+        }
+        if (view.getParent() == host) {
+            return;
+        }
+        if (view.getParent() instanceof ViewGroup) {
+            ((ViewGroup) view.getParent()).removeView(view);
+        }
+        if (host instanceof RelativeLayout) {
+            RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.addRule(RelativeLayout.ALIGN_PARENT_TOP);
+            lp.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
+            lp.setMargins(0, dp2px(timeView ? 50 : 6), dp2px(12), 0);
+            if (!timeView) {
+                lp.addRule(RelativeLayout.BELOW, R.id.tv_live_time);
+            }
+            host.addView(view, lp);
+        } else if (host instanceof FrameLayout) {
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.gravity = Gravity.TOP | Gravity.END;
+            lp.setMargins(0, dp2px(timeView ? 50 : 80), dp2px(12), 0);
+            host.addView(view, lp);
+        } else {
+            host.addView(view);
+        }
+    }
+
+    // ---------------------------------------------------------------- 画中画
+
+    /**
+     * 进入画中画小窗。直接 enterPictureInPictureMode 即可，
+     * 不额外发 HOME 广播（发了会先走一次 onPause，直播画面容易被暂停）。
+     */
+    public void enterPip() {
+        if (!Utils.supportsPiPMode() || isFinishing() || mVideoView == null) {
+            return;
+        }
+        try {
+            int[] videoSize = mVideoView.getVideoSize();
+            Rational ratio = new Rational(16, 9);
+            if (videoSize != null && videoSize.length >= 2 && videoSize[0] > 0 && videoSize[1] > 0) {
+                ratio = new Rational(videoSize[0], videoSize[1]);
+            }
+            PictureInPictureParams params = new PictureInPictureParams.Builder()
+                    .setAspectRatio(ratio)
+                    .build();
+            mInPip = true;
+            enterPictureInPictureMode(params);
+        } catch (Throwable th) {
+            mInPip = false;
+            ToastUtils.showShort("当前设备不支持画中画");
+        }
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode);
+        applyPipUiMode(isInPictureInPictureMode);
+    }
+
+    /**
+     * 小窗里只留画面：EPG 条、频道列表、设置浮层全部收起，视频区撑满整窗；
+     * 退出小窗按当前方向重算布局。
+     */
+    private void applyPipUiMode(boolean pip) {
+        mInPip = pip;
+        View epg = findViewById(R.id.ll_epg);
+        View channelList = findViewById(R.id.tvLeftChannnelListLayout);
+        View column = findViewById(R.id.live_video_column);
+        View videoBox = findViewById(R.id.live_video_box);
+        if (epg != null) {
+            epg.setVisibility(pip ? View.GONE : View.VISIBLE);
+        }
+        if (channelList != null) {
+            channelList.setVisibility(pip ? View.GONE : View.VISIBLE);
+        }
+        if (tvRightSettingLayout != null) {
+            tvRightSettingLayout.setVisibility(View.GONE);
+        }
+        if (column != null && column.getLayoutParams() instanceof LinearLayout.LayoutParams) {
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) column.getLayoutParams();
+            if (pip) {
+                lp.width = LinearLayout.LayoutParams.MATCH_PARENT;
+                lp.height = 0;
+                lp.weight = 1f;
+            } else {
+                lp.height = LinearLayout.LayoutParams.WRAP_CONTENT;
+                lp.weight = 0f;
+            }
+            column.setLayoutParams(lp);
+        }
+        if (videoBox != null && videoBox.getLayoutParams() instanceof LinearLayout.LayoutParams) {
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) videoBox.getLayoutParams();
+            lp.height = pip ? LinearLayout.LayoutParams.MATCH_PARENT : dp2px(240);
+            videoBox.setLayoutParams(lp);
+        }
+        if (!pip) {
+            applyLiveLayoutForScreen();
+            applyLiveVideoBoxSize();
+        }
     }
 
     //显示底部EPG
@@ -474,6 +711,10 @@ public class LiveActivity extends BaseActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        // 小窗(画中画)不是真的离开前台，暂停会把小窗画面停住
+        if (mInPip) {
+            return;
+        }
         if (mVideoView != null) {
             mVideoView.pause();
         }
@@ -481,6 +722,7 @@ public class LiveActivity extends BaseActivity {
 
     @Override
     protected void onDestroy() {
+        stopLiveInfoTicker();
         mHandler.removeCallbacksAndMessages(null);
         super.onDestroy();
         if (mVideoView != null) {
@@ -722,6 +964,19 @@ public class LiveActivity extends BaseActivity {
         controller.setDoubleTapTogglePlayEnabled(false);
         mVideoView.setVideoController(controller);
         mVideoView.setProgressManager(null);
+        // 全屏/退出全屏时把画面叠加信息(时间/网速)迁移到播放器容器，保证全屏也看得到
+        mVideoView.addOnStateChangeListener(new VideoView.SimpleOnStateChangeListener() {
+            @Override
+            public void onPlayerStateChanged(int playerState) {
+                if (playerState == VideoView.PLAYER_FULL_SCREEN) {
+                    relocateLiveInfoOverlay(true);
+                } else if (playerState == VideoView.PLAYER_NORMAL) {
+                    relocateLiveInfoOverlay(false);
+                    // 退出全屏后按当前方向重算视频区高度
+                    applyLiveVideoBoxSize();
+                }
+            }
+        });
     }
 
     @NonNull
@@ -1027,6 +1282,26 @@ public class LiveActivity extends BaseActivity {
         }
         noLiveChannelsShown = true;
         showLoadCallback(LiveEmptyCallback.class);
+    }
+
+    /**
+     * EPG 条上的「切换直播源」：直接列出历史直播源供选择，
+     * 没有历史记录时只提示，不把用户踢出直播页。
+     */
+    private void showLiveSourceDialog() {
+        String currentLive = Hawk.get(HawkConfig.LIVE_URL, "");
+        ArrayList<String> liveHistory = Hawk.get(HawkConfig.LIVE_HISTORY, new ArrayList<String>());
+        if (liveHistory.isEmpty()) {
+            ToastUtils.showShort("暂无历史直播源，可在 设置 → 直播源 中添加");
+            return;
+        }
+        new XPopup.Builder(this)
+                .asCustom(new ApiHistoryDialog(this, currentLive, text -> {
+                    Hawk.put(HawkConfig.LIVE_URL, text.toString());
+                    ToastUtils.showShort("正在切换直播源...");
+                    reloadLiveConfig();
+                }))
+                .show();
     }
 
     /**

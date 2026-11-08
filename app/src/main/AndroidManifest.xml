@@ -68,6 +68,8 @@
         <activity
             android:name=".ui.activity.LiveActivity"
             android:launchMode="singleTop"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout"/>
         <activity
             android:name=".ui.activity.DetailActivity"

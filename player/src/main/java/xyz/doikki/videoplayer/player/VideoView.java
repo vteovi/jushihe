@@ -598,6 +598,15 @@ public class VideoView<P extends AbstractPlayer> extends FrameLayout
     }
 
     /**
+     * 播放器容器。
+     * 全屏时 {@link #mPlayerContainer} 会被搬到 DecorView，页面内的叠加控件
+     * （比如直播页的时间/网速）要跟着挪过去，就不能再挂在自己的布局里。
+     */
+    public FrameLayout getPlayerContainer() {
+        return mPlayerContainer;
+    }
+
+    /**
      * 设置播放速度
      */
     @Override

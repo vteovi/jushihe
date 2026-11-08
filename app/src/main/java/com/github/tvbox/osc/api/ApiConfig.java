@@ -466,8 +466,10 @@ public class ApiConfig {
         //String epgURL  = Hawk.get(HawkConfig.EPG_URL, "");
 
         String liveURL_final = null;
+        JsonArray livesArrayAll = null;
         try {
             if (infoJson.has("lives") && infoJson.get("lives").getAsJsonArray() != null) {
+                livesArrayAll = infoJson.getAsJsonArray("lives");
                 JsonObject livesOBJ = infoJson.get("lives").getAsJsonArray().get(0).getAsJsonObject();
                 String lives = livesOBJ.toString();
                 int index = lives.indexOf("proxy://");
@@ -527,7 +529,17 @@ public class ApiConfig {
 
                     // if FongMi Live URL Formatting exists
                     if (!lives.contains("type")) {
-                        loadLives(infoJson.get("lives").getAsJsonArray());
+                        // 这一支要求 lives 已经是 {group, channels} 的解析态；
+                        // 但有些源（如饭太硬）写的是 {name, url}，直接喂给 loadLives 会抛异常，
+                        // 异常冒到外层 catch 会把后面的直播源包装一起跳过 -> 一条频道都不显示。
+                        // 所以这里包一层：解析失败就记下 url，交给下面按 txt 直播源处理。
+                        try {
+                            loadLives(infoJson.get("lives").getAsJsonArray());
+                        } catch (Throwable ignored) {
+                            if (StringUtils.isBlank(liveURL_final)) {
+                                liveURL_final = findFallbackLiveUrl(livesArrayAll);
+                            }
+                        }
                     } else {
                         // 遍历 lives,跳过指向本地非直播 proxy 的项,取第一条可用的 type=0 直播源
                         JsonObject fengMiLives = null;
@@ -574,6 +586,9 @@ public class ApiConfig {
             // 关键:配置里的直播地址必须包成一条本地 proxy 频道组,LiveActivity 才会去拉取并解析频道列表。
             // 之前只赋值给 liveURL_final 从不使用,导致订阅自带直播源却一条频道都不显示。
             if (liveChannelGroupList.isEmpty()) {
+                if (StringUtils.isBlank(liveURL_final)) {
+                    liveURL_final = findFallbackLiveUrl(livesArrayAll);
+                }
                 if (StringUtils.isBlank(liveURL_final)) {
                     liveURL_final = liveURL;
                 }
@@ -696,6 +711,30 @@ public class ApiConfig {
                 liveHistory.remove(20);
             Hawk.put(HawkConfig.LIVE_HISTORY, liveHistory);
         }
+    }
+
+    /**
+     * lives 数组的兜底扫描：不管有没有 type 字段，只要某一项带 http(s) 的 url，
+     * 就当成 txt 直播源用（饭太硬这类 {name,url} 写法就是这种情况）。
+     */
+    private String findFallbackLiveUrl(JsonArray livesArray) {
+        if (livesArray == null) {
+            return null;
+        }
+        for (JsonElement element : livesArray) {
+            if (!element.isJsonObject()) {
+                continue;
+            }
+            JsonObject obj = element.getAsJsonObject();
+            if (!obj.has("url")) {
+                continue;
+            }
+            String url = obj.get("url").getAsString();
+            if (url.startsWith("http") && !isUnsupportedLocalLiveProxy(url)) {
+                return url;
+            }
+        }
+        return null;
     }
 
     /**
