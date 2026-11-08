@@ -529,22 +529,28 @@ public class ApiConfig {
                     if (!lives.contains("type")) {
                         loadLives(infoJson.get("lives").getAsJsonArray());
                     } else {
-                        JsonObject fengMiLives = infoJson.get("lives").getAsJsonArray().get(0).getAsJsonObject();
-                        String type = fengMiLives.get("type").getAsString();
-                        if (type.equals("0")) {
+                        // 遍历 lives,跳过指向本地非直播 proxy 的项,取第一条可用的 type=0 直播源
+                        JsonObject fengMiLives = null;
+                        for (JsonElement liveElement : infoJson.get("lives").getAsJsonArray()) {
+                            if (!liveElement.isJsonObject()) continue;
+                            JsonObject candidate = liveElement.getAsJsonObject();
+                            if (!candidate.has("type") || !"0".equals(candidate.get("type").getAsString())
+                                    || !candidate.has("url")) {
+                                continue;
+                            }
+                            if (!isUnsupportedLocalLiveProxy(candidate.get("url").getAsString())) {
+                                fengMiLives = candidate;
+                                break;
+                            }
+                        }
+                        if (fengMiLives != null) {
                             String url = fengMiLives.get("url").getAsString();
 
                             // takagen99 : Getting EPG URL from File Config & put into Settings
                             if (fengMiLives.has("epg")) {
                                 String epg = fengMiLives.get("epg").getAsString();
                                 System.out.println("EPG URL :" + epg);
-                                //putEPGHistory(epg);
-                                // Overwrite with EPG URL from Settings
-                                //if (StringUtils.isBlank(epgURL)) {
-                                    Hawk.put(HawkConfig.EPG_URL, epg);
-//                                } else {
-//                                    Hawk.put(HawkConfig.EPG_URL, epgURL);
-//                                }
+                                Hawk.put(HawkConfig.EPG_URL, epg);
                             }
 
                             if (url.startsWith("http")) {
@@ -558,8 +564,6 @@ public class ApiConfig {
 
                                 // Final Live URL
                                 liveURL_final = url;
-
-//                            url = Base64.encodeToString(url.getBytes("UTF-8"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP);
                             }
                         }
                     }
@@ -567,6 +571,19 @@ public class ApiConfig {
 
             }
 
+            // 关键:配置里的直播地址必须包成一条本地 proxy 频道组,LiveActivity 才会去拉取并解析频道列表。
+            // 之前只赋值给 liveURL_final 从不使用,导致订阅自带直播源却一条频道都不显示。
+            if (liveChannelGroupList.isEmpty()) {
+                if (StringUtils.isBlank(liveURL_final)) {
+                    liveURL_final = liveURL;
+                }
+                if (!StringUtils.isBlank(liveURL_final)) {
+                    String proxyLiveUrl = Base64.encodeToString(liveURL_final.getBytes("UTF-8"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP);
+                    LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
+                    liveChannelGroup.setGroupName("http://127.0.0.1:9978/proxy?do=live&type=txt&ext=" + proxyLiveUrl);
+                    liveChannelGroupList.add(liveChannelGroup);
+                }
+            }
 
         } catch (Throwable th) {
             th.printStackTrace();
@@ -678,6 +695,24 @@ public class ApiConfig {
             if (liveHistory.size() > 20)
                 liveHistory.remove(20);
             Hawk.put(HawkConfig.LIVE_HISTORY, liveHistory);
+        }
+    }
+
+    /**
+     * 判断直播地址是不是本机 proxy 里「非直播类」的代理（如 do=json / do=parse），
+     * 这类地址当直播源用一定是坏的，遍历 lives 时要跳过。
+     */
+    private boolean isUnsupportedLocalLiveProxy(String url) {
+        try {
+            Uri uri = Uri.parse(url);
+            String host = uri.getHost();
+            if (!"127.0.0.1".equals(host) && !"localhost".equals(host)) {
+                return false;
+            }
+            String action = uri.getQueryParameter("do");
+            return "/proxy".equals(uri.getPath()) && !TextUtils.isEmpty(action) && !"live".equals(action);
+        } catch (Throwable ignored) {
+            return false;
         }
     }
 

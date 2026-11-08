@@ -32,6 +32,7 @@ import com.hjq.bar.TitleBar;
 import com.kingja.loadsir.callback.Callback;
 import com.kingja.loadsir.core.LoadService;
 import com.kingja.loadsir.core.LoadSir;
+import com.kingja.loadsir.core.Transport;
 import com.lxj.xpopup.XPopup;
 import com.lxj.xpopup.impl.LoadingPopupView;
 import com.orhanobut.hawk.Hawk;
@@ -166,6 +167,24 @@ public abstract class BaseActivity extends AppCompatActivity implements CustomAd
     protected void showSuccess() {
         if (null != mLoadService) {
             mLoadService.showSuccess();
+        }
+    }
+
+    /**
+     * 显示自定义 LoadSir 状态（比如直播页的「暂无直播频道」空状态）
+     */
+    protected void showLoadCallback(Class<? extends Callback> callback) {
+        if (null != mLoadService) {
+            mLoadService.showCallback(callback);
+        }
+    }
+
+    /**
+     * 给自定义 LoadSir 状态绑定内部控件（比如空状态里的「切换直播源」按钮）
+     */
+    protected void setLoadCallbackTransport(Class<? extends Callback> callback, Transport transport) {
+        if (null != mLoadService) {
+            mLoadService.setCallBack(callback, transport);
         }
     }
 

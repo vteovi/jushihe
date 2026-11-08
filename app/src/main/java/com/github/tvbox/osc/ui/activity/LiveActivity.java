@@ -40,6 +40,7 @@ import com.github.tvbox.osc.bean.LiveChannelItem;
 import com.github.tvbox.osc.bean.LivePlayerManager;
 import com.github.tvbox.osc.bean.LiveSettingGroup;
 import com.github.tvbox.osc.bean.LiveSettingItem;
+import com.github.tvbox.osc.callback.LiveEmptyCallback;
 import com.github.tvbox.osc.player.controller.LiveNewController;
 import com.github.tvbox.osc.ui.adapter.LiveChannelGroupNewAdapter;
 import com.github.tvbox.osc.ui.adapter.LiveChannelItemNewAdapter;
@@ -118,6 +119,8 @@ public class LiveActivity extends BaseActivity {
     private Handler mHandler = new Handler();
 
     private List<LiveChannelGroup> liveChannelGroupList = new ArrayList<>();
+    /** 空状态是否已展示，避免重复 showCallback 闪烁 */
+    private boolean noLiveChannelsShown;
     private int currentLiveChannelIndex = -1;
     private int currentLiveChangeSourceTimes = 0;
     private LiveChannelItem currentLiveChannelItem = null;
@@ -170,6 +173,13 @@ public class LiveActivity extends BaseActivity {
             epgStringAddress = "http://epg.51zmt.top:8000/api/diyp/";
 
         setLoadSir(findViewById(R.id.live_root));
+        // 空状态里的「切换直播源」入口
+        setLoadCallbackTransport(LiveEmptyCallback.class, (context, view) -> {
+            View switchBtn = view.findViewById(R.id.btn_switch_source);
+            if (switchBtn != null) {
+                switchBtn.setOnClickListener(v -> showChangeLiveSourceDialog());
+            }
+        });
         mVideoView = findViewById(R.id.mVideoView);
 
         tvLeftChannelListLayout = findViewById(R.id.tvLeftChannnelListLayout);
@@ -935,7 +945,7 @@ public class LiveActivity extends BaseActivity {
     private void initLiveChannelList() {
         List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
         if (list.isEmpty()) {
-            showChangeLiveSourceDialog();
+            showNoLiveChannels();
             return;
         }
 
@@ -945,21 +955,23 @@ public class LiveActivity extends BaseActivity {
         else {
             liveChannelGroupList.clear();
             liveChannelGroupList.addAll(list);
+            noLiveChannelsShown = false;
             showSuccess();
             initLiveState();
         }
     }
 
     public void loadProxyLives(String url) {
+        String realUrl;
         try {
             Uri parsedUrl = Uri.parse(url);
-            url = new String(Base64.decode(parsedUrl.getQueryParameter("ext"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP), "UTF-8");
+            realUrl = new String(Base64.decode(parsedUrl.getQueryParameter("ext"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP), "UTF-8");
         } catch (Throwable th) {
-            showChangeLiveSourceDialog();
+            showNoLiveChannels();
             return;
         }
         showLoading();
-        OkGo.<String>get(url).execute(new AbsCallback<String>() {
+        OkGo.<String>get(realUrl).tag(this).execute(new AbsCallback<String>() {
 
             @Override
             public String convertResponse(okhttp3.Response response) throws Throwable {
@@ -968,29 +980,53 @@ public class LiveActivity extends BaseActivity {
 
             @Override
             public void onSuccess(Response<String> response) {
-                JsonArray livesArray;
-                LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> linkedHashMap = new LinkedHashMap<>();
-                TxtSubscribe.parse(linkedHashMap, response.body());
-                livesArray = TxtSubscribe.live2JsonArray(linkedHashMap);
+                parseProxyLiveContent(response.body());
+            }
 
-                ApiConfig.get().loadLives(livesArray);
-                List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
-                if (list.isEmpty()) {
-                    showChangeLiveSourceDialog();
-                    return;
-                }
-                liveChannelGroupList.clear();
-                liveChannelGroupList.addAll(list);
-
-                mHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        LiveActivity.this.showSuccess();
-                        initLiveState();
-                    }
-                });
+            @Override
+            public void onError(Response<String> response) {
+                super.onError(response);
+                mHandler.post(LiveActivity.this::showNoLiveChannels);
             }
         });
+    }
+
+    /**
+     * 解析直播源内容并刷新频道列表；解析不出频道就显示页面内空状态，
+     * 而不是抛个弹窗把页面留在 loading 上。
+     */
+    private void parseProxyLiveContent(String content) {
+        LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> linkedHashMap = new LinkedHashMap<>();
+        TxtSubscribe.parse(linkedHashMap, content);
+        JsonArray livesArray = TxtSubscribe.live2JsonArray(linkedHashMap);
+        ApiConfig.get().loadLives(livesArray);
+        List<LiveChannelGroup> list = ApiConfig.get().getChannelGroupList();
+        if (list.isEmpty()) {
+            mHandler.post(LiveActivity.this::showNoLiveChannels);
+            return;
+        }
+        liveChannelGroupList.clear();
+        liveChannelGroupList.addAll(list);
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                noLiveChannelsShown = false;
+                LiveActivity.this.showSuccess();
+                initLiveState();
+            }
+        });
+    }
+
+    /** 页面内显示「暂无直播频道」空状态（带切换直播源入口） */
+    private void showNoLiveChannels() {
+        if (isFinishing() || isDestroyed()) {
+            return;
+        }
+        if (noLiveChannelsShown) {
+            return;
+        }
+        noLiveChannelsShown = true;
+        showLoadCallback(LiveEmptyCallback.class);
     }
 
     /**
@@ -1027,17 +1063,19 @@ public class LiveActivity extends BaseActivity {
 
     /** 按新的 LIVE_URL 重新加载配置并刷新直播频道列表 */
     private void reloadLiveConfig() {
+        noLiveChannelsShown = false;
         showLoading();
         ApiConfig.get().loadConfig(false, new ApiConfig.LoadConfigCallback() {
             @Override
             public void success() {
                 mHandler.post(() -> {
-                    showSuccess();
                     liveChannelGroupList.clear();
                     liveChannelGroupList.addAll(ApiConfig.get().getChannelGroupList());
                     if (liveChannelGroupList.isEmpty()) {
-                        showChangeLiveSourceDialog();
+                        showNoLiveChannels();
                     } else {
+                        noLiveChannelsShown = false;
+                        showSuccess();
                         initLiveState();
                     }
                 });
@@ -1050,9 +1088,8 @@ public class LiveActivity extends BaseActivity {
             @Override
             public void error(String msg) {
                 mHandler.post(() -> {
-                    showSuccess();
                     ToastUtils.showShort("直播源加载失败:" + msg);
-                    showChangeLiveSourceDialog();
+                    showNoLiveChannels();
                 });
             }
         }, this);
