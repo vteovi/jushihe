@@ -6,11 +6,11 @@ on:
     branches:
       - master
       - dev
+    tags:
+      - 'v*'
     paths-ignore:
       - '**.md'
       - '.workbuddy/**'
-  tags:
-    - 'v*'
 
 permissions:
   contents: write
