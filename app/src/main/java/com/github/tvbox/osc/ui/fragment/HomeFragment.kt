@@ -28,9 +28,8 @@ import com.github.tvbox.osc.cache.RoomDataManger
 import com.github.tvbox.osc.constant.IntentKey
 import com.github.tvbox.osc.databinding.FragmentHomeBinding
 import com.github.tvbox.osc.server.ControlManager
-import com.github.tvbox.osc.ui.activity.CollectActivity
 import com.github.tvbox.osc.ui.activity.FastSearchActivity
-import com.github.tvbox.osc.ui.activity.HistoryActivity
+import com.github.tvbox.osc.ui.activity.FavoritesActivity
 import com.github.tvbox.osc.ui.activity.MainActivity
 import com.github.tvbox.osc.ui.activity.SubscriptionActivity
 import com.github.tvbox.osc.ui.adapter.SelectDialogAdapter.SelectDialogInterface
@@ -97,11 +96,16 @@ class HomeFragment : BaseVbFragment<FragmentHomeBinding>() {
         mBinding.search.setOnClickListener {
             jumpActivity(FastSearchActivity::class.java)
         }
+        // 收藏与历史记录已合并为一页，这里按入口决定默认落在哪个分栏
         mBinding.ivHistory.setOnClickListener {
-            jumpActivity(HistoryActivity::class.java)
+            jumpActivity(FavoritesActivity::class.java, Bundle().apply {
+                putInt(FavoritesActivity.EXTRA_TAB, FavoritesActivity.TAB_HISTORY)
+            })
         }
         mBinding.ivCollect.setOnClickListener {
-            jumpActivity(CollectActivity::class.java)
+            jumpActivity(FavoritesActivity::class.java, Bundle().apply {
+                putInt(FavoritesActivity.EXTRA_TAB, FavoritesActivity.TAB_COLLECT)
+            })
         }
         setLoadSir(mBinding.contentLayout)
         initViewModel()

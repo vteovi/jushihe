@@ -81,12 +81,10 @@
         <activity
             android:name=".ui.activity.SettingActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
+        <!-- 收藏与历史记录合并页（两个分栏共用），替代原来的 CollectActivity / HistoryActivity -->
         <activity
-            android:name=".ui.activity.HistoryActivity"
+            android:name=".ui.activity.FavoritesActivity"
             android:configChanges="orientation|screenSize|keyboardHidden" />
-        <activity
-            android:name=".ui.activity.CollectActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"/>
 
         <service android:name="com.android.cast.dlna.dmc.DLNACastService"/>
 
