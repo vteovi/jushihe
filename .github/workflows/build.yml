@@ -38,10 +38,10 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'tools platform-tools'
+          packages: 'platform-tools platforms;android-33 build-tools;33.0.2'
 
-      - name: Install SDK packages
-        run: sdkmanager "platforms;android-33" "build-tools;33.0.2"
+      - name: List installed SDK packages
+        run: sdkmanager --list_installed
 
       - name: Set up JDK 11 (for Gradle)
         uses: actions/setup-java@v4
