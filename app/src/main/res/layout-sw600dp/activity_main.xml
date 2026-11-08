@@ -16,8 +16,9 @@
          WindowInsets 的 statusBars inset 再算一次，这里 32dp 只是兜底值）。 -->
     <com.google.android.material.navigationrail.NavigationRailView
         android:id="@+id/nav_rail"
-        android:layout_width="72dp"
+        android:layout_width="64dp"
         android:layout_height="match_parent"
+        android:minWidth="0dp"
         android:background="@color/white"
         android:paddingTop="32dp"
         app:itemIconSize="26dp"

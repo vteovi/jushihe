@@ -1,6 +1,7 @@
 package com.github.tvbox.osc.ui.fragment;
 
 import android.content.Intent;
+import android.os.Bundle;
 import android.net.Uri;
 import android.text.TextUtils;
 
@@ -10,9 +11,8 @@ import com.github.tvbox.osc.R;
 import com.github.tvbox.osc.base.BaseLazyFragment;
 import com.github.tvbox.osc.base.BaseVbFragment;
 import com.github.tvbox.osc.databinding.FragmentMyBinding;
-import com.github.tvbox.osc.ui.activity.CollectActivity;
 import com.github.tvbox.osc.ui.activity.DetailActivity;
-import com.github.tvbox.osc.ui.activity.HistoryActivity;
+import com.github.tvbox.osc.ui.activity.FavoritesActivity;
 import com.github.tvbox.osc.ui.activity.LiveActivity;
 import com.github.tvbox.osc.ui.activity.LocalPlayActivity;
 import com.github.tvbox.osc.ui.activity.SettingActivity;
@@ -53,9 +53,14 @@ public class MyFragment extends BaseVbFragment<FragmentMyBinding> {
 
         mBinding.tvSetting.setOnClickListener(v -> jumpActivity(SettingActivity.class));
 
-        mBinding.tvHistory.setOnClickListener(v -> jumpActivity(HistoryActivity.class));
+        // 收藏与历史记录已合并为一页，两个入口按需定位到对应分栏
+        mBinding.tvHistory.setOnClickListener(v -> jumpActivity(
+                FavoritesActivity.class,
+                FavoritesActivity.tabBundle(FavoritesActivity.TAB_HISTORY)));
 
-        mBinding.tvFavorite.setOnClickListener(v -> jumpActivity(CollectActivity.class));
+        mBinding.tvFavorite.setOnClickListener(v -> jumpActivity(
+                FavoritesActivity.class,
+                FavoritesActivity.tabBundle(FavoritesActivity.TAB_COLLECT)));
 
         mBinding.llSubscription.setOnClickListener(v -> jumpActivity(SubscriptionActivity.class));
 
